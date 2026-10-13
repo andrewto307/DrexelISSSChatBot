@@ -1,0 +1,395 @@
+{
+  "settings": {
+    "label": "followups-rewrite",
+    "run_at": "2026-10-12T19:31:29",
+    "retrieval_only": false,
+    "followup_search": "rewrite",
+    "voyage_model": "voyage-4",
+    "model": "claude-sonnet-5-5",
+    "effort": "low",
+    "grader_model": "claude-opus-5-5"
+  },
+  "summary": {
+    "all": {
+      "count": 7,
+      "hit@6": "100% (7/7)",
+      "correct": "100% (7/7)",
+      "declined": "-",
+      "grounded": "86% (6/7)",
+      "cites_expected": "100% (7/7)",
+      "right_language": "100% (7/7)",
+      "avg_answer_cost": "$0.0157"
+    },
+    "follow-up": {
+      "count": 7,
+      "hit@6": "100% (7/7)",
+      "correct": "100% (7/7)",
+      "declined": "-",
+      "grounded": "86% (6/7)",
+      "cites_expected": "100% (7/7)",
+      "right_language": "100% (7/7)",
+      "avg_answer_cost": "$0.0157"
+    },
+    "errors": 2,
+    "total_cost": "$0.3016"
+  },
+  "records": [
+    {
+      "id": "u01",
+      "type": "follow-up",
+      "question": "How do I apply for it?",
+      "history": [
+        "Can I work off campus during my first year if my program requires an internship?"
+      ],
+      "search_query": "How do I apply for Curricular Practical Training (CPT)?",
+      "answer": "To apply for CPT, follow these steps from ISSS:\n\n1. **Confirm the training is required.**\n   - If you're in the co-op program, first meet with your Steinbright Career Development Center Co-op Advisor.\n   - If not, meet with your academic advisor to confirm the internship is required by your program's established curriculum.\n   - PhD students need secondary approval from the Office of Graduate Studies and a written statement from their PhD advisor explaining why the off-campus training is required for the dissertation.\n2. **Submit your CPT application to ISSS** for final review. The forms are on the [ISSS Student Portal](https://drexel0.sharepoint.com/sites/ISSS-StudentPortal/SitePages/ISSS-Student-Forms.aspx).\n\n**Answer to your earlier first-year question:** In general, you must have been lawfully enrolled full-time and physically present in the U.S. for at least one full academic year (3 quarters or 2 semesters) before becoming eligible. There is an exception for graduate students whose programs require immediate participation in CPT.\n\nOther conditions:\n- You need an internship or training offer directly related to your field.\n- The training must be required for all students in your program.\n- If there's an associated course, you must be registered for it during the CPT term.\n- CPT is limited to 20 hours per week, with some exceptions (such as full-time co-op).\n- Don't start work before the official CPT start date.\n\n**Upcoming change:** A DHS Final Rule is scheduled to take effect September 15, 2026, and students will receive a fixed Admit Until Date. Employment, including CPT, can't continue past that date unless an Extension of Stay is timely filed. Please confirm how this affects you with an ISSS advisor.\n\nSource: [Curricular Practical Training (CPT)](https://drexel.edu/studentlife/student-success/international-student-support/current-students/employment/cpt)",
+      "stop_reason": "end_turn",
+      "hit": true,
+      "first_rank": 1,
+      "retrieved": [
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/current-students/employment/cpt",
+          "section": "Curricular Practical Training (CPT) › Procedure"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/current-students/employment/cpt",
+          "section": "Curricular Practical Training (CPT) › Eligibility Requirements"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/current-students/employment/cpt",
+          "section": "Curricular Practical Training (CPT)"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/current-students/employment/cpt",
+          "section": "Curricular Practical Training (CPT) › Duration of CPT"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/current-students/employment/cpt",
+          "section": "Curricular Practical Training (CPT)"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/current-students/employment/opt",
+          "section": "Optional Practical Training (OPT) › Before Filing OPT Application"
+        }
+      ],
+      "cites_expected_url": true,
+      "answer_cost": 0.015478200000000001,
+      "output_tokens": 625,
+      "grade": {
+        "correct": true,
+        "grounded": true,
+        "right_language": true,
+        "explanation": "The answer correctly identifies CPT and gives the source's steps: see the co-op or academic advisor first, then submit the application to ISSS via the Student Portal. All other claims are supported by the excerpt. One minor issue: the answer calls the DHS rule (effective September 15, 2026) 'upcoming', but the page was retrieved October 12, 2026, so the rule is likely already in effect."
+      },
+      "cost": 0.0434014
+    },
+    {
+      "id": "u02",
+      "type": "follow-up",
+      "question": "When should I apply for it?",
+      "error": "AnswerError('Search is unavailable right now. Try again in a moment.')",
+      "cost": 0.0
+    },
+    {
+      "id": "u03",
+      "type": "follow-up",
+      "question": "What about during summer break?",
+      "history": [
+        "How many hours can I work on campus?"
+      ],
+      "search_query": "Can F-1 and J-1 students work more than 20 hours per week on campus during summer break?",
+      "answer": "During an approved vacation term (such as summer break, if it's an approved vacation term for you), immigration regulations allow F-1 and J-1 students to work **more than 20 hours per week** on campus. However, you must check the Office of Human Resources' own (non-immigration) policies for working on campus during that time, since they may set their own limits.\n\nConditions that still apply:\n- You must still be maintaining valid F-1/J-1 status, be a continuing student who hasn't graduated, and have an unexpired I-20/DS-2019.\n- J-1 students need prior ISSS authorization for any on-campus job.\n- If you're in a co-op cycle, your co-op counts as your \"class,\" so on-campus work stays limited to 20 hours per week.\n\nThe excerpts don't explain how ISSS decides which terms count as an \"approved vacation term\" for your program. Please confirm with an ISSS advisor whether your summer qualifies, especially if you have a summer term, co-op, or a different academic calendar.\n\nSources:\n- [On-Campus Employment](https://drexel.edu/studentlife/student-success/international-student-support/current-students/employment/on-campus-employment)\n- [Maintaining F-1 and J-1 Student Status](https://drexel.edu/studentlife/student-success/international-student-support/current-students/f-1-j-1-maintain)\n- [Human Resources student employment](https://drexel.edu/hr/atDrexel/studentEmployment) (linked from ISSS)",
+      "stop_reason": "end_turn",
+      "hit": true,
+      "first_rank": 1,
+      "retrieved": [
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/current-students/employment/on-campus-employment",
+          "section": "On-Campus Employment › IMPORTANT: Rules for On-Campus Employment"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/current-students/f-1-j-1-maintain",
+          "section": "Maintaining F-1 and J-1 Student Status"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/current-students/employment/cpt",
+          "section": "Curricular Practical Training (CPT)"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/~/media/Drexel/EMSS-Site-Group/StudentLife/Documents/international-student-support/arrival-guide.pdf",
+          "section": "Pre-Arrival Guide"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/current-students/employment/opt",
+          "section": "Optional Practical Training (OPT) › After OPT Is Approved › What kind of employment is allowed while on OPT?"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/current-students/employment/on-campus-employment",
+          "section": "On-Campus Employment"
+        }
+      ],
+      "cites_expected_url": true,
+      "answer_cost": 0.0154021,
+      "output_tokens": 487,
+      "grade": {
+        "correct": true,
+        "grounded": true,
+        "right_language": true,
+        "explanation": "The answer states that working over 20 hours per week is allowed during an approved vacation term, which matches the reference. The added conditions (valid status, continuing student, unexpired I-20/DS-2019, J-1 prior authorization, the co-op limit, and HR policies) are all supported by the excerpts."
+      },
+      "cost": 0.0407797
+    },
+    {
+      "id": "u04",
+      "type": "follow-up",
+      "question": "And for J-1 students?",
+      "history": [
+        "How long is the grace period after F-1 students finish their program?"
+      ],
+      "search_query": "J-1 students grace period after program ends",
+      "answer": "J-1 students (and their J-2 dependents) have a **30-day grace period** after their program ends.\n\n**During the grace period they may:**\n- Pack and prepare to leave the U.S.\n- Travel within the U.S.\n\nThey may **not** work or study. If they aren't securing an extension of their legal status, they're expected to leave the U.S. during this time. Leaving before the grace period ends means they can't re-enter in J-1 status after the DS-2019 expiration date.\n\nThe September 2025 ISSS announcement also says the 30-day period applies after program completion, plus any time on Academic Training.\n\nThe proposed DHS rule I mentioned earlier would shorten the F-1 grace period, but the ISSS pages describe no proposed change to the J-1 grace period. For how this applies to your situation, please confirm with an ISSS advisor.\n\nSources:\n- [Maintaining F-1 and J-1 Student Status](https://drexel.edu/studentlife/student-success/international-student-support/current-students/f-1-j-1-maintain)\n- [DHS Proposes to Replace Duration of Status (Sept. 2025)](https://drexel.edu/studentlife/student-success/international-student-support/announcements/2025/September/DHS-Proposes-to-Replace-Duration-of-Status-for-F-and-J-Visa-Holders-with-Fixed-Periods-of-Stay)",
+      "stop_reason": "end_turn",
+      "hit": true,
+      "first_rank": 1,
+      "retrieved": [
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/current-students/f-1-j-1-maintain",
+          "section": "Maintaining F-1 and J-1 Student Status › The 60- and 30-Day Grace Periods"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/announcements/2020/December/2020-us-immigration-policy-updates-archive",
+          "section": "2020 U.S. Immigration Policy Updates Archive › Policy Updates Archive › DHS Publishes a Proposed Rule to Eliminate Duration of Status (D/S) for F and J Visa Holders, September 25, 2020"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/announcements/2025/September/DHS-Proposes-to-Replace-Duration-of-Status-for-F-and-J-Visa-Holders-with-Fixed-Periods-of-Stay",
+          "section": "Department of Homeland Security Proposes to Replace Duration of Status for F and J Visa Holders with Fixed Periods of Stay › What is Duration of Status D/S?"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/announcements/2025/September/DHS-Proposes-to-Replace-Duration-of-Status-for-F-and-J-Visa-Holders-with-Fixed-Periods-of-Stay",
+          "section": "Department of Homeland Security Proposes to Replace Duration of Status for F and J Visa Holders with Fixed Periods of Stay › What is the impact on F-1 students and J-1 Exchange Visitors and their F-2 and J-2 dependents if the proposed rule is implemented?"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/current-students/employment/opt",
+          "section": "Optional Practical Training (OPT) › Expiration of OPT Authorization"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/announcements/2020/December/2020-us-immigration-policy-updates-archive",
+          "section": "2020 U.S. Immigration Policy Updates Archive › Policy Updates Archive › DHS Publishes a Proposed Rule to Eliminate Duration of Status (D/S) for F and J Visa Holders, September 25, 2020"
+        }
+      ],
+      "cites_expected_url": true,
+      "answer_cost": 0.0158864,
+      "output_tokens": 460,
+      "grade": {
+        "correct": true,
+        "grounded": true,
+        "right_language": true,
+        "explanation": "The answer correctly states the 30-day J-1 grace period. Every added detail (permitted activities, the work/study ban, the Academic Training extension, and the proposed rule affecting only F-1) is supported by the excerpts."
+      },
+      "cost": 0.0464778
+    },
+    {
+      "id": "u05",
+      "type": "follow-up",
+      "question": "How much money do I need to show for her?",
+      "history": [
+        "Can I bring my wife to the U.S. while I study at Drexel?"
+      ],
+      "search_query": "financial resources required for F-2 spouse dependent",
+      "answer": "You need to show **$4,000 for a spouse**, in addition to the funds that cover your own tuition, fees, and living expenses. ISSS says this amount applies regardless of how long she will stay in the U.S. If you also bring children, it is $2,000 for each child. Source: [Request For Dependent I-20/DS-2019](https://drexel.edu/studentlife/student-success/international-student-support/current-students/dependents)\n\nYou show this with an updated official bank statement, submitted with the Add a Dependent form on the [ISSS Student Portal](https://drexel0.sharepoint.com/sites/ISSS-StudentPortal/SitePages/ISSS-Student-Forms.aspx).\n\n**Note on J-1:** A different ISSS page, aimed at J-1 exchange visitors (scholars), lists the J-2 funding as $600/month for a spouse and $400/month per child ([J1 Exchange Visitors](https://drexel.edu/studentlife/student-success/international-student-support/hiring-foreign-nationals/j1-scholars)). The student dependents page gives the $4,000 / $2,000 figures for both F-1 and J-1 students. If you are a J-1 student, I'd confirm the exact amount with an ISSS advisor before preparing your documents.",
+      "stop_reason": "end_turn",
+      "hit": true,
+      "first_rank": 2,
+      "retrieved": [
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/hiring-foreign-nationals/j1-scholars",
+          "section": "J1 Exchange Visitors › J-2 Dependents"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/current-students/dependents",
+          "section": "Request For Dependent I-20/DS-2019"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/new-international-students",
+          "section": "New International Students › J-1 Exchange Visitor Visa Status"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/new-international-students",
+          "section": "New International Students › Comparison of F-1 and J-1 Visas"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/new-international-students",
+          "section": "New International Students › F-1 Visa Status"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/travel",
+          "section": "Travel Information › Required Travel Documents for International Travel"
+        }
+      ],
+      "cites_expected_url": true,
+      "answer_cost": 0.0138364,
+      "output_tokens": 426,
+      "grade": {
+        "correct": true,
+        "grounded": true,
+        "right_language": true,
+        "explanation": "The answer correctly states the $4,000 spouse amount plus details that are supported by the excerpts (the $2,000 per child, the regardless-of-length rule and the bank statement). The J-1 scholar note accurately reflects the J1 Exchange Visitors page."
+      },
+      "cost": 0.037366800000000006
+    },
+    {
+      "id": "u06",
+      "type": "follow-up",
+      "question": "Can I travel abroad while it's pending?",
+      "error": "AnswerError('Search is unavailable right now. Try again in a moment.')",
+      "cost": 0.0
+    },
+    {
+      "id": "u07",
+      "type": "follow-up",
+      "question": "What do I need to do before I come back?",
+      "history": [
+        "I want to take a term off and go home next quarter."
+      ],
+      "search_query": "What do I need to do before returning to Drexel after taking a term off?",
+      "answer": "What you need to do depends on how long you're away and how ISSS handles your absence.\n\n**First, for any leave:** get approval from your academic program to return. Ask your academic advisor how to report your return to Drexel.\n\n**If your absence was authorized by ISSS and lasts less than 5 months:**\nYou can request that your SEVIS record be reactivated. Submit these at least 1-2 months before you return:\n- I-94 travel history (proof you left the U.S.)\n- A copy of your flight itinerary showing your planned re-entry date\n- Proof of full-time enrollment for the upcoming term (registration records or a letter from your academic advisor)\n\nSEVP decides whether to approve this. If they don't, you'll need a new I-20 instead.\n\n**If you're away more than 5 months, or your SEVIS record was terminated for reasons other than \"Authorized Early Withdrawal\":**\n- Email ISSS at least 3 months before your planned return for instructions on applying for a new I-20/DS-2019.\n- You'll need to pay the SEVIS I-901 fee again.\n- This creates a break in your F-1 status. You must complete at least one academic year of full-time study before becoming eligible for certain F-1 benefits, such as CPT or OPT.\n\n**Travel documents:** before you leave the U.S., check that you have a valid travel signature on your I-20/DS-2019 (ISSS says to request a new one if yours will be more than six months old when you return), and see the visa renewal page for enrollment verification and financial documents if you need a new visa.\n\nSince timelines depend on your specific situation, please confirm with an ISSS advisor before you leave.\n\nSources:\n- [Vacation and Leave of Absence](https://drexel.edu/studentlife/student-success/international-student-support/current-students/vacation-loa)\n- [Visa Renewal](https://drexel.edu/studentlife/student-success/international-student-support/current-students/visa-renewal)",
+      "stop_reason": "end_turn",
+      "hit": true,
+      "first_rank": 1,
+      "retrieved": [
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/current-students/vacation-loa",
+          "section": "Vacation and Leave of Absence › Returning from a Leave of Absence"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/current-students/vacation-loa",
+          "section": "Vacation and Leave of Absence"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/announcements/2024/December/re-entry",
+          "section": "U.S. Re-Entry Advisory for International Students"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/current-students/visa-renewal",
+          "section": "Visa Renewal › Preparations Before You Leave the U.S."
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/current-students",
+          "section": "Current Students › Tips for Maintaining Your Student Visa Status"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/current-students/less-than-full-time",
+          "section": "Less Than Full Time › Students May Be Authorized to Go LTFT in the Following Cases › Medical Reason(s)"
+        }
+      ],
+      "cites_expected_url": true,
+      "answer_cost": 0.018663799999999998,
+      "output_tokens": 636,
+      "grade": {
+        "correct": true,
+        "grounded": true,
+        "right_language": true,
+        "explanation": "The answer covers the under-5-month SEVIS reactivation documents and timing, and notes that a longer absence needs a new I-20/DS-2019. The travel signature and visa renewal details are supported by the Visa Renewal excerpt."
+      },
+      "cost": 0.0478996
+    },
+    {
+      "id": "u08",
+      "type": "follow-up",
+      "question": "Who is eligible for it?",
+      "history": [
+        "What is Academic Training for J-1 students?"
+      ],
+      "search_query": "Academic Training eligibility requirements for J-1 students at Drexel",
+      "answer": "To be eligible for Academic Training with Drexel, a J-1 student must meet all of these requirements:\n\n- Your DS-2019 was issued by Drexel, not an outside agency (such as Fulbright).\n- You are primarily in the U.S. to study, rather than to do academic training.\n- You are in good academic standing.\n- The training is directly related to the major field of study listed on your DS-2019.\n- The AT is approved and listed on your DS-2019 before your program end date.\n- The AT starts no later than 30 days after your program ends.\n\n**Time limits that also apply:**\n- Bachelor's and master's students: up to 18 months, or the length of the degree program if shorter (STEM degrees may qualify for a special extension).\n- PhD students: up to 36 months, or the length of the degree program if shorter.\n- Non-degree students: your DS-2019 can't extend beyond 24 months total, including degree time and AT.\n\nIf you're unsure whether you qualify, please confirm with an ISSS advisor.\n\nSource: [Academic Training for J-1 Students](https://drexel.edu/studentlife/student-success/international-student-support/current-students/employment/j1-employment)",
+      "stop_reason": "end_turn",
+      "hit": true,
+      "first_rank": 1,
+      "retrieved": [
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/current-students/employment/j1-employment",
+          "section": "Academic Training for J-1 Students › What Is Academic Training?"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/hiring-foreign-nationals/j1-scholars",
+          "section": "J1 Exchange Visitors"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/current-students/employment/j1-employment",
+          "section": "Academic Training for J-1 Students"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/current-students/employment/j1-employment",
+          "section": "Academic Training for J-1 Students"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/current-students/employment/cpt",
+          "section": "Curricular Practical Training (CPT) › Eligibility Requirements"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/new-international-students",
+          "section": "New International Students › J-1 Exchange Visitor Visa Status"
+        }
+      ],
+      "cites_expected_url": true,
+      "answer_cost": 0.0146486,
+      "output_tokens": 382,
+      "grade": {
+        "correct": true,
+        "grounded": true,
+        "right_language": true,
+        "explanation": "The answer covers all the eligibility requirements in the reference. Its additional time-limit details are drawn accurately from the source excerpt."
+      },
+      "cost": 0.0401872
+    },
+    {
+      "id": "u09",
+      "type": "follow-up",
+      "question": "Tôi được phép thất nghiệp bao nhiêu ngày?",
+      "history": [
+        "Tôi đang làm OPT sau khi tốt nghiệp."
+      ],
+      "search_query": "Post-Completion OPT unemployment allowance days",
+      "answer": "Bạn được phép tối đa **90 ngày thất nghiệp** (tổng cộng) trong thời gian Post-Completion OPT.\n\n**Cách tính:**\n- Mỗi ngày, kể cả cuối tuần, trong khoảng thời gian hiệu lực OPT mà bạn không có việc làm đủ điều kiện đều được tính là một ngày thất nghiệp.\n- Thời gian OPT bắt đầu tính từ ngày bắt đầu làm việc ghi trên thẻ EAD của bạn.\n\n**Nếu sắp chạm giới hạn:** Bạn phải hành động *trước* ngày thất nghiệp cuối cùng, chẳng hạn:\n- Nộp đơn học tiếp (đổi cấp học) hoặc chuyển sang trường SEVP-certified khác.\n- Rời khỏi Hoa Kỳ.\n- Thực hiện hành động khác để duy trì tình trạng hợp pháp.\n\n**Hậu quả nếu vượt quá 90 ngày:** Bạn vi phạm tình trạng F-1, hồ sơ SEVIS có thể bị chấm dứt, và bạn không được hưởng thời gian ân hạn 60 ngày. Điều này cũng có thể ảnh hưởng đến các quyền lợi di trú sau này (như H-1B, thẻ xanh).\n\n**Lưu ý thêm:** Công việc phải từ 20 giờ/tuần trở lên, và bạn phải báo việc làm trong SEVIS.\n\nĐể biết chính xác bạn đã dùng bao nhiêu ngày và nên làm gì, hãy liên hệ cố vấn ISSS của bạn.\n\nNguồn:\n- [Optional Practical Training (OPT)](https://drexel.edu/studentlife/student-success/international-student-support/current-students/employment/opt)",
+      "stop_reason": "end_turn",
+      "hit": true,
+      "first_rank": 1,
+      "retrieved": [
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/current-students/employment/opt",
+          "section": "Optional Practical Training (OPT) › After OPT Is Approved › What if I can't find a job while on OPT?"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/current-students/employment/opt",
+          "section": "Optional Practical Training (OPT) › After OPT Is Approved › Post-Completion OPT: What are my reporting responsibilities?"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/current-students/employment/opt",
+          "section": "Optional Practical Training (OPT) › After OPT Is Approved › What kind of employment is allowed while on OPT?"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/current-students/employment/opt",
+          "section": "Optional Practical Training (OPT) › Expiration of OPT Authorization"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/current-students/employment/opt",
+          "section": "Optional Practical Training (OPT) › Before Filing OPT Application"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/current-students/employment/opt",
+          "section": "Optional Practical Training (OPT) › Before Filing OPT Application › How much OPT is allowed?"
+        }
+      ],
+      "cites_expected_url": true,
+      "answer_cost": 0.016175600000000002,
+      "output_tokens": 649,
+      "grade": {
+        "correct": true,
+        "grounded": false,
+        "right_language": true,
+        "explanation": "The answer correctly states the 90-day aggregate unemployment limit on Post-Completion OPT. However, its claim that employment must be reported in SEVIS is not in the excerpts, which mention only unspecified 'OPT reporting requirements'."
+      },
+      "cost": 0.045488200000000006
+    }
+  ]
+}

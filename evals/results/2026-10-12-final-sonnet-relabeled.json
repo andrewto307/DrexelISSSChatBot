@@ -1,0 +1,146 @@
+{
+  "settings": {
+    "label": "final-sonnet-relabeled",
+    "run_at": "2026-10-12T20:13:33",
+    "retrieval_only": false,
+    "followup_search": "rewrite",
+    "voyage_model": "voyage-4",
+    "model": "claude-sonnet-5-5",
+    "effort": "low",
+    "grader_model": "claude-opus-5-5"
+  },
+  "summary": {
+    "all": {
+      "count": 2,
+      "hit@6": "100% (1/1)",
+      "correct": "100% (1/1)",
+      "declined": "100% (1/1)",
+      "grounded": "100% (2/2)",
+      "cites_expected": "100% (1/1)",
+      "right_language": "100% (2/2)",
+      "avg_answer_cost": "$0.0098"
+    },
+    "factual": {
+      "count": 1,
+      "hit@6": "100% (1/1)",
+      "correct": "100% (1/1)",
+      "declined": "-",
+      "grounded": "100% (1/1)",
+      "cites_expected": "100% (1/1)",
+      "right_language": "100% (1/1)",
+      "avg_answer_cost": "$0.0032"
+    },
+    "out-of-scope": {
+      "count": 1,
+      "hit@6": "-",
+      "correct": "-",
+      "declined": "100% (1/1)",
+      "grounded": "100% (1/1)",
+      "cites_expected": "-",
+      "right_language": "100% (1/1)",
+      "avg_answer_cost": "$0.0164"
+    },
+    "errors": 0,
+    "total_cost": "$0.0696"
+  },
+  "records": [
+    {
+      "id": "f28",
+      "type": "factual",
+      "question": "What's the weather like in Philadelphia in January?",
+      "history": [],
+      "search_queries": [
+        "What's the weather like in Philadelphia in January?"
+      ],
+      "answer": "According to the ISSS Pre-Arrival Guide, Philadelphia gets very cold in winter: temperatures can drop as low as 10°F (-12°C) in January and February. The guide recommends bringing or buying clothing suited to the different types of weather, especially for winter.\n\nFor comparison, summers can exceed 90°F (32°C) in July and August.\n\nSource: [Pre-Arrival Guide](https://drexel.edu/studentlife/~/media/Drexel/EMSS-Site-Group/StudentLife/Documents/international-student-support/arrival-guide.pdf)",
+      "stop_reason": "end_turn",
+      "hit": true,
+      "first_rank": 1,
+      "retrieved": [
+        {
+          "url": "https://drexel.edu/studentlife/~/media/Drexel/EMSS-Site-Group/StudentLife/Documents/international-student-support/arrival-guide.pdf",
+          "section": "Pre-Arrival Guide"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/~/media/Drexel/EMSS-Site-Group/StudentLife/Documents/international-student-support/arrival-guide.pdf",
+          "section": "Pre-Arrival Guide"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/~/media/Drexel/EMSS-Site-Group/StudentLife/Documents/international-student-support/transportation-to-philadelphia.pdf",
+          "section": "Transportation to Philadelphia"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/~/media/Drexel/EMSS-Site-Group/StudentLife/Documents/international-student-support/transportation-to-philadelphia.pdf",
+          "section": "Transportation to Philadelphia"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/~/media/Drexel/EMSS-Site-Group/StudentLife/Documents/international-student-support/transportation-to-philadelphia.pdf",
+          "section": "Transportation to Philadelphia"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/~/media/Drexel/EMSS-Site-Group/StudentLife/Documents/international-student-support/transportation-to-philadelphia.pdf",
+          "section": "Transportation to Philadelphia"
+        }
+      ],
+      "cites_expected_url": true,
+      "answer_cost": 0.0032332,
+      "output_tokens": 196,
+      "grade": {
+        "correct": true,
+        "grounded": true,
+        "right_language": true,
+        "explanation": "The answer correctly states the guide's figure of as cold as 10°F (-12°C) in January and February and advises winter clothing, as the reference does. The summer comparison is also in the excerpt, so every claim is supported."
+      },
+      "cost": 0.030413199999999998
+    },
+    {
+      "id": "o04",
+      "type": "out-of-scope",
+      "question": "Which restaurant near campus has the best cheesesteak?",
+      "history": [],
+      "search_queries": [
+        "Which restaurant near campus has the best cheesesteak?"
+      ],
+      "answer": "I couldn't find any information about cheesesteak restaurants on the ISSS website, so I can't recommend one. ISSS doesn't appear to rank or recommend restaurants.\n\nA few ISSS-linked resources might help you explore Philadelphia food on your own:\n\n- **Campus Philly** (from the Pre-Arrival Guide) connects students with local restaurants, shops, and vendors. It offers student discounts and food reviews, and you can follow @campusphilly on Instagram.\n- **Uwishunu**, also in the Pre-Arrival Guide, lists things to do in Greater Philadelphia, as a guide for exploring like a local.\n- **Visit Philly** is an external city guide listed on the [Other Resources for International Students](https://drexel.edu/studentlife/student-success/international-student-support/other-resources) page.\n\nOne tip from the guide: restaurant tipping is customarily 10%–20% of the bill.\n\nSource: [Pre-Arrival Guide](https://drexel.edu/studentlife/~/media/Drexel/EMSS-Site-Group/StudentLife/Documents/international-student-support/arrival-guide.pdf)",
+      "stop_reason": "end_turn",
+      "hit": null,
+      "first_rank": null,
+      "retrieved": [
+        {
+          "url": "https://drexel.edu/studentlife/~/media/Drexel/EMSS-Site-Group/StudentLife/Documents/international-student-support/arrival-guide.pdf",
+          "section": "Pre-Arrival Guide"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/other-resources",
+          "section": "Other Resources for International Students"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/~/media/Drexel/EMSS-Site-Group/StudentLife/Documents/international-student-support/transportation-to-philadelphia.pdf",
+          "section": "Transportation to Philadelphia"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/~/media/Drexel/EMSS-Site-Group/StudentLife/Documents/international-student-support/arrival-guide.pdf",
+          "section": "Pre-Arrival Guide"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/~/media/Drexel/EMSS-Site-Group/StudentLife/Documents/international-student-support/arrival-guide.pdf",
+          "section": "Pre-Arrival Guide"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/current-students/employment/on-campus-employment",
+          "section": "On-Campus Employment › How to Find an On-campus Job"
+        }
+      ],
+      "cites_expected_url": null,
+      "answer_cost": 0.0163905,
+      "output_tokens": 386,
+      "grade": {
+        "correct": true,
+        "grounded": true,
+        "right_language": true,
+        "explanation": "The answer says the information isn't on the ISSS website and doesn't recommend any restaurant. The resources it points to (Campus Philly, Uwishunu, Visit Philly) and the 10%–20% tipping tip all appear in the excerpts."
+      },
+      "cost": 0.0392025
+    }
+  ]
+}

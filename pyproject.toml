@@ -1,0 +1,16 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+filterwarnings = ["ignore:builtin type .* has no __module__ attribute:DeprecationWarning"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "I", "UP", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+"isss_bot/answer.py" = ["E501"]
+"evals/run_eval.py" = ["E501"]
+"tests/*" = ["E501"]
