@@ -1,0 +1,91 @@
+{
+  "settings": {
+    "label": "labels-f19-1",
+    "run_at": "2026-10-15T15:11:12",
+    "retrieval_only": false,
+    "followup_search": "rewrite",
+    "voyage_model": "voyage-4",
+    "model": "claude-sonnet-5-5",
+    "effort": "low",
+    "grader_model": "claude-opus-5-5"
+  },
+  "summary": {
+    "all": {
+      "count": 1,
+      "hit@6": "100% (1/1)",
+      "correct": "100% (1/1)",
+      "declined": "-",
+      "grounded": "0% (0/1)",
+      "cites_expected": "100% (1/1)",
+      "right_language": "100% (1/1)",
+      "avg_answer_cost": "$0.0176"
+    },
+    "factual": {
+      "count": 1,
+      "hit@6": "100% (1/1)",
+      "correct": "100% (1/1)",
+      "declined": "-",
+      "grounded": "0% (0/1)",
+      "cites_expected": "100% (1/1)",
+      "right_language": "100% (1/1)",
+      "avg_answer_cost": "$0.0176"
+    },
+    "errors": 0,
+    "total_cost": "$0.0454"
+  },
+  "records": [
+    {
+      "id": "f19",
+      "type": "factual",
+      "question": "How long can a J-1 master's student do Academic Training?",
+      "history": [],
+      "search_queries": [
+        "How long can a J-1 master's student do Academic Training?"
+      ],
+      "answer": "Master's students on a J-1 can do Academic Training (AT) for up to **18 months, or the length of their degree program, whichever is shorter**. Students pursuing a STEM degree may qualify for a special extension. [(ISSS Academic Training page)](https://drexel.edu/studentlife/student-success/international-student-support/current-students/employment/j1-employment)\n\nKey conditions:\n- AT during your studies and AT after your program ends are added together toward the limit. Full-time and part-time AT count equally.\n- AT must be approved and listed on your DS-2019 before your program end date, and it must start no later than 30 days after your program ends.\n- It must be directly related to your major field of study on your DS-2019.\n- Submit your request to ISSS at least 30 days before your DS-2019 end date. ISSS recommends allowing about three weeks for processing. The form is on the [ISSS Student Portal](https://drexel0.sharepoint.com/sites/ISSS-StudentPortal/SitePages/ISSS-Student-Forms.aspx).\n\nOn the duration of status rule: DHS published a final rule on July 17, 2026 that would require USCIS extensions for post-completion AT. However, a federal court [postponed its effective date on September 14, 2026](https://drexel.edu/studentlife/student-success/international-student-support/announcements/2026/September/US-District-Court-Postpones-Effective-Date-of-DHS-Final-Rule-on-Duration-of-Status) and barred DHS from implementing it. ISSS is monitoring the situation.\n\nFor details on the STEM extension or your own situation, please confirm with an ISSS advisor.",
+      "stop_reason": "end_turn",
+      "hit": true,
+      "first_rank": 1,
+      "retrieved": [
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/current-students/employment/j1-employment",
+          "section": "Academic Training for J-1 Students › What Is Academic Training?"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/announcements/2025/September/DHS-Proposes-to-Replace-Duration-of-Status-for-F-and-J-Visa-Holders-with-Fixed-Periods-of-Stay",
+          "section": "Department of Homeland Security Proposes to Replace Duration of Status for F and J Visa Holders with Fixed Periods of Stay › What is the impact on F-1 students and J-1 Exchange Visitors and their F-2 and J-2 dependents if the proposed rule is implemented?"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/current-students/employment/j1-employment",
+          "section": "Academic Training for J-1 Students"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/current-students/employment/j1-employment",
+          "section": "Academic Training for J-1 Students"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/announcements/2025/September/DHS-Proposes-to-Replace-Duration-of-Status-for-F-and-J-Visa-Holders-with-Fixed-Periods-of-Stay",
+          "section": "Department of Homeland Security Proposes to Replace Duration of Status for F and J Visa Holders with Fixed Periods of Stay › What is Duration of Status D/S?"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/announcements/2026/July/Department-of-Homeland-Security-Publishes-Final-Rule-Eliminating-Duration-of-Status",
+          "section": "Department of Homeland Security Publishes Final Rule Eliminating Duration of Status"
+        },
+        {
+          "url": "https://drexel.edu/studentlife/student-success/international-student-support/announcements/2026/September/US-District-Court-Postpones-Effective-Date-of-DHS-Final-Rule-on-Duration-of-Status",
+          "section": "US District Court Postpones Effective Date of DHS Final Rule on Duration of Status"
+        }
+      ],
+      "cites_expected_url": true,
+      "answer_cost": 0.0175755,
+      "output_tokens": 546,
+      "grade": {
+        "correct": true,
+        "grounded": false,
+        "right_language": true,
+        "explanation": "The 18-month (or program length, whichever is shorter) limit for master's students is correct and supported. However, the answer says the July 2026 final rule would require USCIS extensions for post-completion AT, but that excerpt mentions only extra program time and post-completion OPT; AT appears only in the 2025 proposed rule."
+      },
+      "cost": 0.0454155
+    }
+  ]
+}

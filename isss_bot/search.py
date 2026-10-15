@@ -1,7 +1,7 @@
 import re
 import sys
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import psycopg
 from pgvector import Vector
@@ -15,6 +15,8 @@ KEYWORD_WEIGHT = 0.3
 RRF_K = 60
 DEFAULT_LIMIT = 6
 MAX_UPDATES = 2
+OLD_ANNOUNCEMENT_YEARS = 3
+OLD_ANNOUNCEMENT_WEIGHT = 0.9
 MARKDOWN_LINK = re.compile(r"\]\((https?://[^)\s]+)\)")
 
 VECTOR_SEARCH = """
@@ -40,6 +42,11 @@ WHERE pages.status = 'active'
 GROUP BY chunks.id
 ORDER BY sum(weights.weight) DESC, chunks.id
 LIMIT %s
+"""
+
+OLD_ANNOUNCEMENTS = """
+SELECT chunks.id FROM chunks JOIN pages ON pages.id = chunks.page_id
+WHERE chunks.id = ANY(%s) AND pages.page_type = 'announcement' AND pages.announcement_date < %s
 """
 
 ANNOUNCEMENTS = """
@@ -97,13 +104,21 @@ def reciprocal_rank_fusion(
     return sorted(scores.items(), key=lambda pair: (-pair[1], pair[0]))
 
 
+def demote(fused: list[tuple[int, float]], items: set[int], weight: float) -> list[tuple[int, float]]:
+    rescored = [(item, score * weight if item in items else score) for item, score in fused]
+    return sorted(rescored, key=lambda pair: (-pair[1], pair[0]))
+
+
 def search(
     conn: psycopg.Connection, query: str, limit: int = DEFAULT_LIMIT, query_vector: list[float] | None = None
 ) -> list[SearchResult]:
     vector = Vector(query_vector if query_vector is not None else embed_query(query))
     vector_ids = [row["id"] for row in conn.execute(VECTOR_SEARCH, (vector, CANDIDATES_PER_METHOD))]
     keyword_ids = [row["id"] for row in conn.execute(KEYWORD_SEARCH, (query, CANDIDATES_PER_METHOD))]
-    fused = reciprocal_rank_fusion([vector_ids, keyword_ids], [1.0, KEYWORD_WEIGHT])[:limit]
+    fused = reciprocal_rank_fusion([vector_ids, keyword_ids], [1.0, KEYWORD_WEIGHT])
+    cutoff = date.today() - timedelta(days=365 * OLD_ANNOUNCEMENT_YEARS)
+    old = {row["id"] for row in conn.execute(OLD_ANNOUNCEMENTS, ([chunk_id for chunk_id, _ in fused], cutoff))}
+    fused = demote(fused, old, OLD_ANNOUNCEMENT_WEIGHT)[:limit]
 
     details = {row["chunk_id"]: row for row in conn.execute(CHUNK_DETAILS, ([chunk_id for chunk_id, _ in fused],))}
     vector_ranks = {chunk_id: rank for rank, chunk_id in enumerate(vector_ids, start=1)}

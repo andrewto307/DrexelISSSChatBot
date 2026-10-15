@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from isss_bot import config, db
+from isss_bot import config, db, migrate
 from isss_bot.crawl import CrawlReport, crawl
 from isss_bot.index import IndexReport, index
 
@@ -41,7 +41,7 @@ def main() -> int:
     parser.add_argument("command", choices=["crawl", "index", "all"])
     args = parser.parse_args()
 
-    db.create_schema()
+    migrate.apply()
     exit_code = 0
     with db.connect() as conn:
         if args.command in ("crawl", "all"):

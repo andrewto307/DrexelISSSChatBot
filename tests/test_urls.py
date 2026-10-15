@@ -1,6 +1,6 @@
 import pytest
 
-from isss_bot.urls import classify_link, is_isss_document, is_isss_page, normalize_url, url_key
+from isss_bot.urls import classify_link, is_isss_document, is_isss_page, linked_url_keys, normalize_url, url_key
 
 HOME = "https://drexel.edu/studentlife/student-success/international-student-support"
 DOCS = (
@@ -26,6 +26,11 @@ def test_url_key_treats_case_spaces_and_hyphens_alike():
     assert url_key(f"{HOME}/announcements/2025/december/uscis%20policy%20memo") == url_key(
         f"{HOME}/announcements/2025/December/USCIS-Policy-Memo"
     )
+
+
+def test_linked_url_keys_find_markdown_and_bare_links():
+    text = f"See [CPT]({HOME}/cpt/#eligibility) and {HOME}/opt. ISSS points to [USCIS](https://www.uscis.gov/i-765)."
+    assert linked_url_keys(text) == {url_key(f"{HOME}/cpt"), url_key(f"{HOME}/opt"), "www.uscis.gov/i-765"}
 
 
 @pytest.mark.parametrize(

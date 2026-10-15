@@ -1,10 +1,8 @@
-from datetime import UTC, date, datetime
-from pathlib import Path
+from datetime import date
 
 import anthropic
 import httpx
 import pytest
-from anthropic.types import Message, TextBlock, Usage
 
 from isss_bot.answer import (
     SYSTEM_PROMPT,
@@ -15,90 +13,13 @@ from isss_bot.answer import (
     TextDelta,
     build_user_message,
     concat_query,
+    content_as_sent,
     retrieve,
     search_queries_for,
 )
-from isss_bot.search import SearchResult
-
-CPT_URL = "https://drexel.edu/studentlife/student-success/international-student-support/current-students/employment/cpt"
-CPT_TEXT = (Path(__file__).parent / "fixtures" / "cpt.txt").read_text()
-REQUEST = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
-
-
-def _result(url=CPT_URL, title="Curricular Practical Training (CPT)", index=0, content=CPT_TEXT, **extra):
-    values = {
-        "chunk_id": index,
-        "chunk_index": index,
-        "url": url,
-        "title": title,
-        "page_type": "page",
-        "announcement_date": None,
-        "fetched_at": datetime(2026, 10, 12, 14, 0, tzinfo=UTC),
-        "heading_path": title,
-        "content": content,
-        "score": 0.03,
-        "vector_rank": 1,
-        "keyword_rank": 1,
-    }
-    return SearchResult(**{**values, **extra})
-
-
-def _message(text: str, stop_reason: str = "end_turn") -> Message:
-    return Message.model_construct(
-        id="msg_test",
-        type="message",
-        role="assistant",
-        model="claude-sonnet-5-5",
-        content=[TextBlock(type="text", text=text)],
-        stop_reason=stop_reason,
-        stop_sequence=None,
-        usage=Usage(input_tokens=1000, output_tokens=100, cache_creation_input_tokens=0, cache_read_input_tokens=0),
-    )
-
-
-class FakeStream:
-    def __init__(self, message: Message):
-        self.message = message
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *exc_info):
-        return False
-
-    @property
-    def text_stream(self):
-        text = self.message.content[0].text
-        yield from (text[: len(text) // 2], text[len(text) // 2 :])
-
-    def get_final_message(self) -> Message:
-        return self.message
-
-
-class FakeMessages:
-    def __init__(self, replies, rewrite_reply=None):
-        self.replies = list(replies)
-        self.rewrite_reply = rewrite_reply
-        self.stream_calls = []
-        self.create_calls = []
-
-    def stream(self, **request):
-        self.stream_calls.append({**request, "messages": list(request["messages"])})
-        reply = self.replies.pop(0)
-        if isinstance(reply, Exception):
-            raise reply
-        return FakeStream(reply)
-
-    def create(self, **request):
-        self.create_calls.append(request)
-        if isinstance(self.rewrite_reply, Exception):
-            raise self.rewrite_reply
-        return self.rewrite_reply
-
-
-class FakeClient:
-    def __init__(self, replies=(), rewrite_reply=None):
-        self.messages = FakeMessages(replies, rewrite_reply)
+from tests.fakes import CPT_URL, REQUEST, FakeClient
+from tests.fakes import claude_message as _message
+from tests.fakes import search_result as _result
 
 
 def _conversation(client, searched=None, **options):
@@ -237,13 +158,15 @@ def test_ask_streams_the_answer_and_keeps_history_append_only():
     assert answer.sources[0].url == CPT_URL
     assert answer.cost_usd == pytest.approx((1000 * 2 + 100 * 10) / 1_000_000)
 
-    _ask(conversation, "How do I apply for it?")
+    _, follow_up = _ask(conversation, "How do I apply for it?")
     first_request, second_request = client.messages.stream_calls
     assert searched == ["Can I do CPT in my first year?", "How do I apply for it? | Can I do CPT in my first year?"]
     assert second_request["messages"][:2] == first_request["messages"] + [
-        {"role": "assistant", "content": first.content}
+        {"role": "assistant", "content": content_as_sent(first.content)}
     ]
-    assert second_request["messages"][1]["content"] is first.content
+    assert second_request["messages"][0]["content"] == answer.user_content
+    assert second_request["messages"][1]["content"] == answer.assistant_content
+    assert follow_up.assistant_content == [{"type": "text", "text": "Apply through the ISSS Student Portal."}]
     assert "Student question: How do I apply for it?" in second_request["messages"][2]["content"]
     for request in (first_request, second_request):
         assert request["system"] == SYSTEM_PROMPT
@@ -277,6 +200,16 @@ def test_newer_updates_are_shown_to_claude_with_what_they_update():
     message = client.messages.stream_calls[0]["messages"][0]["content"]
     assert f'published="2026-09-14" retrieved="2026-10-12" updates="{rule}">' in message
     assert client.messages.stream_calls[0]["system"] == SYSTEM_PROMPT
+
+
+def test_thinking_blocks_are_kept_with_their_signature():
+    client = FakeClient([_message("One year first.", thinking="cpt rule"), _message("Use the portal.")])
+    conversation = _conversation(client)
+    _, answer = _ask(conversation, "Can I do CPT now?")
+    _ask(conversation, "How?")
+    resent = client.messages.stream_calls[1]["messages"][1]["content"]
+    assert resent == answer.assistant_content
+    assert resent[0] == {"type": "thinking", "thinking": "cpt rule", "signature": "signature-for-cpt rule"}
 
 
 def test_refusal_is_not_kept_in_history():

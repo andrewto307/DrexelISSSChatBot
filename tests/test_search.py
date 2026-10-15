@@ -1,11 +1,11 @@
 import math
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from pgvector import Vector
 
 from isss_bot import config
-from isss_bot.search import SearchResult, newer_updates, reciprocal_rank_fusion, search
+from isss_bot.search import SearchResult, demote, newer_updates, reciprocal_rank_fusion, search
 
 ANNOUNCEMENTS = "https://drexel.edu/studentlife/student-success/international-student-support/announcements"
 
@@ -24,6 +24,12 @@ def test_reciprocal_rank_fusion_applies_weights():
 
 def test_reciprocal_rank_fusion_handles_empty_rankings():
     assert [item for item, _ in reciprocal_rank_fusion([[], [7, 8]])] == [7, 8]
+
+
+def test_demote_lowers_only_the_given_items_and_reorders():
+    fused = [(1, 0.020), (2, 0.019), (3, 0.010)]
+    assert demote(fused, {1}, 0.9) == [(2, 0.019), (1, pytest.approx(0.018)), (3, 0.010)]
+    assert demote(fused, set(), 0.9) == fused
 
 
 def _unit_vector(*axes: int) -> list[float]:
@@ -91,6 +97,20 @@ def test_search_combines_vector_and_keyword_matches(conn):
     assert results["https://test.invalid/vector"].vector_rank == 1
     assert results["https://test.invalid/keyword"].keyword_rank == 1
     assert "https://test.invalid/gone" not in results
+
+
+def test_search_ranks_announcements_older_than_three_years_a_little_lower(conn):
+    today = date.today()
+    _add_page(conn, "https://test.invalid/old", "Old rule.", _unit_vector(0), published=today - timedelta(days=4 * 365))
+    _add_page(
+        conn, "https://test.invalid/recent", "Recent rule.", _unit_vector(0), published=today - timedelta(days=30)
+    )
+    _add_page(conn, "https://test.invalid/page", "Current page.", _unit_vector(0))
+
+    urls = [result.url for result in search(conn, "what is it?", query_vector=_unit_vector(0))]
+
+    assert urls[-1] == "https://test.invalid/old"
+    assert set(urls) == {"https://test.invalid/old", "https://test.invalid/recent", "https://test.invalid/page"}
 
 
 def test_search_with_only_stop_words_uses_vectors(conn):
