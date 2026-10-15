@@ -5,7 +5,7 @@ import pytest
 from psycopg import sql
 from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
-from isss_bot import config, db
+from isss_bot import config, db, migrate
 
 
 @pytest.fixture(scope="session")
@@ -24,11 +24,15 @@ def database_url() -> str:
     return make_conninfo(config.DATABASE_URL, dbname=name)
 
 
+@pytest.fixture(scope="session")
+def migrated_database_url(database_url) -> str:
+    migrate.apply(database_url)
+    return database_url
+
+
 @pytest.fixture
-def conn(database_url, monkeypatch):
-    monkeypatch.setattr(config, "DATABASE_URL", database_url)
-    db.create_schema()
-    connection = db.connect()
+def conn(migrated_database_url):
+    connection = db.connect(migrated_database_url)
     try:
         yield connection
     finally:

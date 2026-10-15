@@ -24,7 +24,7 @@ How to answer:
 - Answer only from the ISSS website excerpts inside <isss_sources>. Each student message comes with excerpts found for that question; excerpts from earlier messages still count.
 - If the excerpts don't answer the question, say you couldn't find it on the ISSS website and suggest contacting ISSS or an ISSS advisor (contact details are on {config.ISSS_HOME}). Don't fill gaps with general knowledge, guesses ("likely", "probably"), or websites and offices that aren't in the excerpts.
 - Be concise: the direct answer first, then only the key steps or conditions. Stay under about 200 words unless the student asks for more detail.
-- Cite the ISSS pages you used as markdown links, using only URLs that appear in the excerpts.
+- Cite the ISSS pages you used as markdown links in the sentences they support, using only URLs that appear in the excerpts. Don't end with a list of sources: the chat shows the pages you link below your answer.
 - Reply in the language the student writes in, even though the excerpts are in English.
 
 Dates and changes:
@@ -34,7 +34,7 @@ Dates and changes:
 - When a rule depends on a date (an upcoming change, a deadline, an effective date), give the date. Point out a given upcoming change once per conversation, not in every answer.
 - A source marked updates="URL" is a newer ISSS announcement about the announcement at that URL, which another excerpt links to. Treat it as the latest word on that topic.
 - Don't assume a scheduled change took effect just because its date has passed. Say what the page says, unless a newer excerpt updates it.
-- Bring up an announcement only when it changes the answer to the student's question. A proposed rule isn't final and a final rule can differ from its proposal, so never carry details from one announcement over to another.
+- Bring up an announcement only when it changes the answer to the student's question. When you mention a rule from an announcement, say whether it's proposed or final and give the post's date. State each detail only for the announcement that says it: if the final rule's post doesn't mention something, say so instead of borrowing it from the proposal.
 
 Links:
 - Links to other websites (for example USCIS, the Department of State, or law firms) may be shared, labeled as external, for example "ISSS points to USCIS for this: [Form I-765](...)". Don't describe what an external page says beyond what the ISSS excerpt says about it.
@@ -71,6 +71,8 @@ class Answer:
     stop_reason: str | None
     usage: anthropic.types.Usage
     cost_usd: float
+    user_content: str
+    assistant_content: list[dict]
 
     @property
     def refused(self) -> bool:
@@ -79,6 +81,15 @@ class Answer:
     @property
     def cut_off(self) -> bool:
         return self.stop_reason == "max_tokens"
+
+
+def content_as_sent(content: list) -> list[dict]:
+    return [
+        block.model_dump(
+            mode="json", by_alias=True, exclude_unset=True, exclude=getattr(block, "__api_exclude__", None)
+        )
+        for block in content
+    ]
 
 
 def format_sources(results: list[SearchResult]) -> str:
@@ -195,7 +206,8 @@ class Conversation:
         except voyageai.error.VoyageError as error:
             raise AnswerError("Search is unavailable right now. Try again in a moment.") from error
         sources += self.find_updates(self.conn, sources)
-        self.messages.append({"role": "user", "content": build_user_message(question, sources, self.today())})
+        user_content = build_user_message(question, sources, self.today())
+        self.messages.append({"role": "user", "content": user_content})
 
         request = {
             "model": self.model,
@@ -225,10 +237,11 @@ class Conversation:
             raise AnswerError(f"The Claude API returned an error ({error.status_code}).") from error
 
         text = "".join(block.text for block in response.content if block.type == "text")
+        assistant_content = content_as_sent(response.content)
         if response.stop_reason == "refusal":
             self.messages.pop()
         else:
-            self.messages.append({"role": "assistant", "content": response.content})
+            self.messages.append({"role": "assistant", "content": assistant_content})
             self.questions.append(question)
             self.answers.append(text)
         yield Answer(
@@ -238,4 +251,6 @@ class Conversation:
             stop_reason=response.stop_reason,
             usage=response.usage,
             cost_usd=cost_usd(self.model, response.usage) + query_cost,
+            user_content=user_content,
+            assistant_content=assistant_content,
         )

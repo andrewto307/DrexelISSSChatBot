@@ -21,3 +21,10 @@ CHAT_MODEL = os.environ.get("CHAT_MODEL") or "claude-sonnet-5-5"
 CHAT_EFFORT = os.environ.get("CHAT_EFFORT") or "low"
 REWRITE_MODEL = os.environ.get("REWRITE_MODEL") or "claude-haiku-4-5"
 FOLLOWUP_SEARCH = os.environ.get("FOLLOWUP_SEARCH") or "rewrite"
+
+MAX_QUESTION_CHARACTERS = 1000
+RATE_LIMIT_MESSAGES = int(os.environ.get("RATE_LIMIT_MESSAGES") or 20)
+RATE_LIMIT_WINDOW_SECONDS = int(os.environ.get("RATE_LIMIT_WINDOW_SECONDS") or 3600)
+TRUSTED_PROXIES = frozenset(filter(None, (os.environ.get("TRUSTED_PROXIES") or "").split(",")))
+IP_HASH_SECRET = os.environ.get("IP_HASH_SECRET") or "local-development"
+DEV_MODE = (os.environ.get("DEV_MODE") or "").lower() in {"1", "true", "yes"}

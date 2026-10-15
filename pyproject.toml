@@ -2,6 +2,7 @@
 testpaths = ["tests"]
 pythonpath = ["."]
 filterwarnings = ["ignore:builtin type .* has no __module__ attribute:DeprecationWarning"]
+markers = ["browser: drives a real Chromium through Playwright"]
 
 [tool.ruff]
 line-length = 120

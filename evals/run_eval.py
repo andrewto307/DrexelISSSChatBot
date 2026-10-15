@@ -1,6 +1,5 @@
 import argparse
 import json
-import re
 import sys
 import threading
 import time
@@ -27,13 +26,12 @@ from isss_bot.answer import (
 from isss_bot.embed import embed_queries, embed_query
 from isss_bot.pricing import cost_usd
 from isss_bot.search import DEFAULT_LIMIT, SearchResult, search
-from isss_bot.urls import url_key
+from isss_bot.urls import linked_url_keys, url_key
 
 ROOT = Path(__file__).resolve().parent.parent
 QUESTIONS_PATH = ROOT / "evals" / "questions.jsonl"
 RESULTS_DIR = ROOT / "evals" / "results"
 DEFAULT_GRADER_MODEL = "claude-opus-5-5"
-LINK = re.compile(r"https?://[^\s)\]>\"']+")
 
 GRADER_SYSTEM_PROMPT = """You grade answers from a chatbot for international students. The chatbot must answer only from excerpts of Drexel University's International Students and Scholars Services (ISSS) website, which are shown to you exactly as the chatbot saw them."""
 
@@ -106,8 +104,7 @@ def score_retrieval(item: dict, results: list[SearchResult]) -> dict:
 def cites_expected(item: dict, text: str) -> bool | None:
     if not item["expected_urls"]:
         return None
-    expected = {url_key(url) for url in item["expected_urls"]}
-    return any(url_key(url.rstrip(".,;")) in expected for url in LINK.findall(text))
+    return bool(linked_url_keys(text) & {url_key(url) for url in item["expected_urls"]})
 
 
 def grade(client: anthropic.Anthropic, model: str, item: dict, answer: Answer) -> tuple[dict, float]:

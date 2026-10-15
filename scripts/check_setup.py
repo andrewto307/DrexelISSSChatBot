@@ -44,7 +44,8 @@ def check_anthropic() -> None:
     except anthropic.APIConnectionError:
         report("fail", "Anthropic", "can't reach the API; check your internet connection")
     except anthropic.APIStatusError as e:
-        report("fail", "Anthropic", f"API error {e.status_code}")
+        error = e.body.get("error", {}) if isinstance(e.body, dict) else {}
+        report("fail", "Anthropic", f"API error {e.status_code}: {error.get('message', 'no details')}")
     else:
         report("ok", "Anthropic", f"key works; {model.display_name} ({config.CHAT_MODEL}) available")
 

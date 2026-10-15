@@ -26,6 +26,7 @@ IGNORED_LINK = re.compile(
 )
 
 PATH_SAFE_CHARACTERS = "/:@!$&'()*+,;=~"
+URL_IN_TEXT = re.compile(r"https?://[^\s)\]>\"']+")
 
 
 def normalize_url(url: str) -> str:
@@ -44,6 +45,10 @@ def url_key(url: str) -> str:
     parts = urlsplit(normalize_url(url))
     path = unquote(parts.path).lower().replace(" ", "-")
     return f"{parts.netloc}{path}"
+
+
+def linked_url_keys(text: str) -> set[str]:
+    return {url_key(url.rstrip(".,;")) for url in URL_IN_TEXT.findall(text)}
 
 
 def _drexel_path(url: str) -> str | None:

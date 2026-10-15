@@ -8,7 +8,8 @@ Not affiliated with Drexel University or ISSS, and not legal advice.
 
 1. **Crawl:** downloads the ISSS pages and the ISSS documents they link to. Links to other sites are recorded but never read.
 2. **Index:** splits each page into sections, embeds them with Voyage AI, and stores them in Postgres with pgvector and a full-text index.
-3. **Answer:** hybrid search (vector and keyword results merged with reciprocal rank fusion) picks the most relevant sections, and Claude answers from them.
+3. **Answer:** hybrid search (vector and keyword results merged with reciprocal rank fusion) picks the most relevant sections. Newer announcements that update a linked announcement are added too. Claude then answers from them.
+4. **Chat:** a FastAPI app streams answers to a web page, with source links, feedback buttons, and conversations saved in Postgres.
 
 ## Setup
 
@@ -16,9 +17,10 @@ Requires Python 3.12+, Docker, an [Anthropic API key](https://console.anthropic.
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env          # then fill in ANTHROPIC_API_KEY and VOYAGE_API_KEY
-docker compose up -d          # Postgres + pgvector on localhost:5433
+pip install -r requirements.txt         # the app's packages plus pytest, ruff and Playwright
+python -m playwright install chromium   # only needed for the browser tests
+cp .env.example .env                    # then fill in ANTHROPIC_API_KEY and VOYAGE_API_KEY
+docker compose up -d                    # Postgres + pgvector on localhost:5433
 python scripts/check_setup.py
 ```
 
@@ -26,15 +28,26 @@ python scripts/check_setup.py
 
 ```bash
 python scripts/update_index.py all      # crawl the site, then embed new or changed pages
+uvicorn app.main:app --reload           # the chat page at http://localhost:8000
+python scripts/chat_cli.py --sources    # or chat in the terminal
 python -m isss_bot.search "Can I do CPT in my first year?"
-python scripts/chat_cli.py --sources    # chat in the terminal
 ```
 
-## Tests and evaluation
+Set `DEV_MODE=true` to show each answer's cost and search queries on the page. Database migrations run automatically; `python scripts/migrate.py` runs them by hand.
+
+## Feedback and evaluation
 
 ```bash
-pytest                                  # no API calls; database tests roll back their changes
-ruff check . && ruff format --check .
+python scripts/review_feedback.py               # answers students rated not helpful
+python scripts/review_feedback.py --questions 20 # recent questions as draft eval lines
 python evals/run_eval.py --label my-run --retrieval-only   # search quality only
 python evals/run_eval.py --label my-run                    # answers graded by Claude
+```
+
+## Tests
+
+```bash
+pytest                       # no API calls; uses a separate isss_test database
+pytest -m "not browser"      # skip the Playwright browser tests
+ruff check . && ruff format --check .
 ```
