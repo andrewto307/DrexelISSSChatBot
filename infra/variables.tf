@@ -38,6 +38,18 @@ variable "github_repository" {
   default     = "andrewto307/DrexelISSSChatBot"
 }
 
+variable "github_owner_id" {
+  description = "Permanent numeric ID of the repository's owner, part of the GitHub OIDC token's subject."
+  type        = string
+  default     = "183786447"
+}
+
+variable "github_repository_id" {
+  description = "Permanent numeric ID of the repository, part of the GitHub OIDC token's subject."
+  type        = string
+  default     = "1416122830"
+}
+
 variable "instance_type" {
   type    = string
   default = "t4g.small"
