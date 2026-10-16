@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily ISSS update (09:00 UTC, after the backup)
+
+[Timer]
+OnCalendar=*-*-* 09:00:00 UTC
+Persistent=true
+RandomizedDelaySec=10min
+
+[Install]
+WantedBy=timers.target

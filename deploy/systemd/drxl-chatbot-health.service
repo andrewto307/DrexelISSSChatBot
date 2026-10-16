@@ -1,0 +1,9 @@
+[Unit]
+Description=Check that the site answers through HTTPS
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/drxl-chatbot/health.sh
+StandardOutput=append:/var/log/drxl-chatbot/jobs.log
+StandardError=append:/var/log/drxl-chatbot/jobs.log

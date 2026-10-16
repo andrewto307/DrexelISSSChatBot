@@ -133,6 +133,17 @@ def visible_messages(conn: psycopg.Connection, conversation_id: uuid.UUID) -> li
     return visible
 
 
+def delete_old_conversations(conn: psycopg.Connection, older_than_days: int) -> int:
+    return conn.execute(
+        """
+        DELETE FROM conversations c
+        WHERE coalesce((SELECT max(m.created_at) FROM messages m WHERE m.conversation_id = c.id), c.created_at)
+            < now() - make_interval(days => %s)
+        """,
+        (older_than_days,),
+    ).rowcount
+
+
 def record_usage(conn: psycopg.Connection, user_id: int, cost_usd: float) -> None:
     conn.execute(
         """

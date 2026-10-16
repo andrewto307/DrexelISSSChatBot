@@ -1,0 +1,10 @@
+[Unit]
+Description=Nightly chat cleanup and backup (08:00 UTC, about 3-4 a.m. in Philadelphia)
+
+[Timer]
+OnCalendar=*-*-* 08:00:00 UTC
+Persistent=true
+RandomizedDelaySec=10min
+
+[Install]
+WantedBy=timers.target

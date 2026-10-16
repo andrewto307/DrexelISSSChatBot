@@ -1,8 +1,15 @@
 from typing import Protocol
 
+import boto3
+from botocore.exceptions import BotoCoreError, ClientError
+
 from isss_bot import config
 
 SIGN_OFF = "\n\nIf you didn't ask for this, you can ignore this email.\n\nISSS Assistant (unofficial)"
+
+
+class MailError(Exception):
+    pass
 
 
 def compose(purpose: str, code: str | None) -> tuple[str, str]:
@@ -35,7 +42,30 @@ class ConsoleMailer:
         print(f"\n--- Email to {email} (printed instead of sent) ---\nSubject: {subject}\n\n{body}\n", flush=True)
 
 
+class SesMailer:
+    def __init__(self, sender: str, client=None):
+        self.sender = sender
+        self.client = client or boto3.client("sesv2")
+
+    def send(self, email: str, purpose: str, code: str | None = None) -> None:
+        subject, body = compose(purpose, code)
+        try:
+            self.client.send_email(
+                FromEmailAddress=self.sender,
+                Destination={"ToAddresses": [email]},
+                Content={"Simple": {"Subject": {"Data": subject}, "Body": {"Text": {"Data": body}}}},
+            )
+        except ClientError as error:
+            raise MailError(error.response.get("Error", {}).get("Code", "ClientError")) from error
+        except BotoCoreError as error:
+            raise MailError(type(error).__name__) from error
+
+
 def create_mailer(kind: str = config.MAILER) -> Mailer:
     if kind == "console":
         return ConsoleMailer()
-    raise ValueError(f"Unknown MAILER {kind!r}. Only 'console' is available for now.")
+    if kind == "ses":
+        if not config.MAIL_FROM:
+            raise ValueError("MAILER=ses needs MAIL_FROM, the address login codes are sent from.")
+        return SesMailer(config.MAIL_FROM)
+    raise ValueError(f"Unknown MAILER {kind!r}. Use 'console' or 'ses'.")

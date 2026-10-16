@@ -3,8 +3,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
+from app.events import log_event
 from app.limits import client_ip
 from isss_bot import auth
+from isss_bot.mailer import MailError
 
 SESSION_COOKIE = "isss_session"
 LOGIN_REQUIRED_MESSAGE = "Your session has ended. Log in to keep chatting."
@@ -13,6 +15,7 @@ TOO_MANY_ATTEMPTS_MESSAGE = "Too many attempts. Wait 15 minutes and try again."
 WRONG_LOGIN_MESSAGE = "That email and password don't match an account."
 VERIFY_FIRST_MESSAGE = "Verify your email first. Enter the 6-digit code we sent you."
 WRONG_CODE_MESSAGE = "That code is wrong or has expired. Check the email, or send a new code."
+EMAIL_ERROR_MESSAGE = "We couldn't send the email right now. Please try again in a few minutes."
 
 router = APIRouter(prefix="/api/auth")
 
@@ -79,6 +82,14 @@ def start_session(request: Request, response: Response, user_id: int, session_ve
     )
 
 
+def send_email(request: Request, email: str, purpose: str, code: str | None = None) -> None:
+    try:
+        request.app.state.mailer.send(email, purpose, code)
+    except MailError as error:
+        log_event("email_error", purpose=purpose, error=str(error))
+        raise HTTPException(503, EMAIL_ERROR_MESSAGE) from error
+
+
 def code_sent(email: str) -> dict:
     return {"email": email, "message": f"We sent a 6-digit code to {email}. It expires in 15 minutes."}
 
@@ -99,7 +110,7 @@ def signup(body: PasswordRequest, request: Request) -> dict:
         if user_id is not None:
             purpose, code = "verify", auth.issue_code(conn, user_id, "verify")
     if purpose == "exists" or code:
-        request.app.state.mailer.send(email, purpose, code)
+        send_email(request, email, purpose, code)
     return code_sent(email)
 
 
@@ -113,7 +124,7 @@ def resend(body: EmailRequest, request: Request) -> dict:
         if user and not user["verified_at"]:
             code = auth.issue_code(conn, user["id"], "verify")
     if code:
-        request.app.state.mailer.send(email, "verify", code)
+        send_email(request, email, "verify", code)
     return code_sent(email)
 
 
@@ -149,7 +160,7 @@ def login(body: PasswordRequest, request: Request, response: Response) -> dict:
         raise HTTPException(401, WRONG_LOGIN_MESSAGE)
     if not user["verified_at"]:
         if code:
-            request.app.state.mailer.send(email, "verify", code)
+            send_email(request, email, "verify", code)
         raise HTTPException(403, VERIFY_FIRST_MESSAGE)
     start_session(request, response, user["id"], user["session_version"])
     return {"email": email}
@@ -175,7 +186,7 @@ def forgot(body: EmailRequest, request: Request) -> dict:
         if user:
             code = auth.issue_code(conn, user["id"], "reset")
     if code:
-        request.app.state.mailer.send(email, "reset", code)
+        send_email(request, email, "reset", code)
     return {"email": email, "message": f"If {email} has an account, we sent it a 6-digit code."}
 
 

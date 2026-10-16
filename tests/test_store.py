@@ -1,5 +1,10 @@
+import json
+import os
+import subprocess
+import sys
 import uuid
 from datetime import date
+from pathlib import Path
 
 import pytest
 
@@ -130,3 +135,49 @@ def test_daily_usage_adds_up_and_outlasts_deleted_chats(conn):
 
     assert store.questions_today(conn, user_id) - questions_before == 2
     assert store.cost_today(conn) - cost_before == pytest.approx(0.035)
+
+
+def _message(conn, conversation_id, days_ago: int) -> int:
+    return conn.execute(
+        """
+        INSERT INTO messages (conversation_id, position, role, content, created_at)
+        VALUES (%s, 0, 'user', '"Can I do CPT?"', now() - make_interval(days => %s))
+        RETURNING id
+        """,
+        (conversation_id, days_ago),
+    ).fetchone()["id"]
+
+
+def test_chats_idle_for_15_days_are_deleted_with_their_feedback(conn):
+    user_id = verified_user(conn, "cleanup@drexel.edu")["id"]
+    old, recent, old_but_active, empty = (store.create_conversation(conn, user_id, None) for _ in range(4))
+    conn.execute(
+        "UPDATE conversations SET created_at = now() - interval '20 days' WHERE id = ANY(%s)",
+        ([old, old_but_active, empty],),
+    )
+    old_message = _message(conn, old, 20)
+    store.save_feedback(conn, user_id, old_message, -1, "wrong")
+    _message(conn, recent, 1)
+    _message(conn, old_but_active, 2)
+    store.record_usage(conn, user_id, 0.01)
+
+    assert store.delete_old_conversations(conn, 15) >= 2
+    remaining = {row["id"] for row in conn.execute("SELECT id FROM conversations WHERE user_id = %s", (user_id,))}
+    assert remaining == {recent, old_but_active}
+    assert conn.execute("SELECT 1 FROM feedback WHERE message_id = %s", (old_message,)).fetchone() is None
+    assert store.questions_today(conn, user_id) == 1
+
+
+def test_the_cleanup_script_prints_a_summary(migrated_database_url):
+    root = Path(__file__).resolve().parent.parent
+    result = subprocess.run(
+        [sys.executable, str(root / "scripts" / "cleanup_chats.py")],
+        env={**os.environ, "DATABASE_URL": migrated_database_url, "CHAT_RETENTION_DAYS": "15"},
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    summary = json.loads(result.stdout)
+    assert summary["event"] == "chat_cleanup"
+    assert summary["older_than_days"] == 15
+    assert summary["conversations_deleted"] >= 0
