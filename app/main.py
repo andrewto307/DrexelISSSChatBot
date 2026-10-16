@@ -2,10 +2,8 @@ import hashlib
 import hmac
 import json
 import logging
-import threading
 import time
 import uuid
-from collections import defaultdict, deque
 from collections.abc import Callable, Iterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -15,14 +13,18 @@ from typing import Annotated, Literal
 import anthropic
 import psycopg
 import voyageai.error
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from psycopg_pool import ConnectionPool
 from pydantic import BaseModel, Field, StringConstraints
 
+from app import accounts
+from app.accounts import MaybeUser, User
+from app.limits import RateLimiter, client_ip
 from isss_bot import config, db, migrate, store
 from isss_bot.answer import MAX_QUESTIONS, Answer, AnswerError, Conversation, TextDelta
+from isss_bot.mailer import Mailer, create_mailer
 from isss_bot.search import newer_updates, search
 
 STATIC_DIR = Path(__file__).with_name("static")
@@ -46,6 +48,10 @@ SECURITY_HEADERS = {
 }
 STREAM_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
 RATE_LIMIT_MESSAGE = "You've sent a lot of questions in a short time. Please wait a few minutes and try again."
+RESTING_MESSAGE = (
+    "The assistant is resting until tomorrow because it reached its daily limit. "
+    "For anything urgent, contact ISSS directly."
+)
 REFUSAL_MESSAGE = "I can't help with that one. Try asking about an ISSS topic in a different way."
 SAVE_ERROR_MESSAGE = "Something went wrong while saving this answer. Please try again."
 UNEXPECTED_ERROR_MESSAGE = "Something went wrong on our side. Please try again."
@@ -86,26 +92,13 @@ class AppOptions:
     followup_search: str = config.FOLLOWUP_SEARCH
     dev_mode: bool = config.DEV_MODE
     trusted_proxies: frozenset[str] = config.TRUSTED_PROXIES
-
-
-class RateLimiter:
-    def __init__(self, limit: int, window_seconds: float, clock: Callable[[], float] = time.monotonic):
-        self.limit = limit
-        self.window_seconds = window_seconds
-        self.clock = clock
-        self.hits: dict[str, deque[float]] = defaultdict(deque)
-        self.lock = threading.Lock()
-
-    def allow(self, key: str) -> bool:
-        now = self.clock()
-        with self.lock:
-            hits = self.hits[key]
-            while hits and hits[0] <= now - self.window_seconds:
-                hits.popleft()
-            if len(hits) >= self.limit:
-                return False
-            hits.append(now)
-            return True
+    mailer: Mailer | None = None
+    cookie_secure: bool = config.COOKIE_SECURE
+    auth_rate_limit: int = config.AUTH_RATE_LIMIT_ATTEMPTS
+    auth_ip_rate_limit: int = config.AUTH_RATE_LIMIT_IP_ATTEMPTS
+    auth_rate_window_seconds: int = config.AUTH_RATE_LIMIT_WINDOW_SECONDS
+    daily_question_limit: int = config.DAILY_QUESTION_LIMIT
+    daily_cost_cap_usd: float = config.DAILY_COST_CAP_USD
 
 
 def sse(event: str, data: dict) -> str:
@@ -114,14 +107,6 @@ def sse(event: str, data: dict) -> str:
 
 def log_event(event: str, **fields) -> None:
     logger.info(json.dumps({"event": event, **fields}, default=str))
-
-
-def client_ip(request: Request, trusted_proxies: frozenset[str]) -> str:
-    peer = request.client.host if request.client else "unknown"
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded and peer in trusted_proxies:
-        return forwarded.split(",")[-1].strip()
-    return peer
 
 
 def hash_ip(ip: str) -> str:
@@ -139,14 +124,13 @@ def error_kind(error: AnswerError) -> str:
     return "unknown"
 
 
-def current_user() -> None:
-    return None
-
-
 def create_app(options: AppOptions | None = None) -> FastAPI:
     options = options or AppOptions()
     limiter = RateLimiter(options.rate_limit, options.rate_window_seconds)
     full_message = f"This chat reached {options.max_questions} questions. Start a new chat to keep going."
+    daily_limit_message = (
+        f"You've asked {options.daily_question_limit} questions today, the daily limit. You can ask more tomorrow."
+    )
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -159,13 +143,20 @@ def create_app(options: AppOptions | None = None) -> FastAPI:
             app.state.pool.close()
 
     app = FastAPI(title="ISSS Assistant", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+    app.state.mailer = options.mailer or create_mailer()
+    app.state.cookie_secure = options.cookie_secure
+    app.state.trusted_proxies = options.trusted_proxies
+    app.state.auth_limiter = RateLimiter(options.auth_rate_limit, options.auth_rate_window_seconds)
+    app.state.auth_ip_limiter = RateLimiter(options.auth_ip_rate_limit, options.auth_rate_window_seconds)
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+    app.include_router(accounts.router)
 
     @app.middleware("http")
     async def add_security_headers(request: Request, call_next):
         response = await call_next(request)
         for name, value in SECURITY_HEADERS.items():
             response.headers.setdefault(name, value)
+        response.headers.setdefault("Cache-Control", "no-store" if request.url.path.startswith("/api/") else "no-cache")
         return response
 
     def conversation_options(request: Request) -> dict:
@@ -178,7 +169,7 @@ def create_app(options: AppOptions | None = None) -> FastAPI:
         }
 
     def stream_answer(
-        pool: ConnectionPool, conversation: Conversation, conversation_id: uuid.UUID, question: str
+        pool: ConnectionPool, user_id: int, conversation: Conversation, conversation_id: uuid.UUID, question: str
     ) -> Iterator[str]:
         started = time.monotonic()
         first_token_seconds = None
@@ -204,6 +195,7 @@ def create_app(options: AppOptions | None = None) -> FastAPI:
                 return
             try:
                 message_id = store.save_turn(conn, conversation_id, question, answer)
+                store.record_usage(conn, user_id, answer.cost_usd)
                 conn.commit()
             except psycopg.Error as error:
                 conn.rollback()
@@ -250,6 +242,12 @@ def create_app(options: AppOptions | None = None) -> FastAPI:
     def index() -> FileResponse:
         return FileResponse(STATIC_DIR / "index.html")
 
+    @app.get("/login", include_in_schema=False, response_model=None)
+    def login_page(user: MaybeUser) -> FileResponse | RedirectResponse:
+        if user is not None:
+            return RedirectResponse("/", status_code=303)
+        return FileResponse(STATIC_DIR / "login.html")
+
     @app.get("/health")
     def health(request: Request) -> dict:
         try:
@@ -260,31 +258,40 @@ def create_app(options: AppOptions | None = None) -> FastAPI:
         return {"status": "ok"}
 
     @app.post("/api/chat")
-    def chat(body: ChatRequest, request: Request, user: None = Depends(current_user)) -> StreamingResponse:
-        ip = client_ip(request, options.trusted_proxies)
-        if not limiter.allow(ip):
+    def chat(body: ChatRequest, request: Request, user: User) -> StreamingResponse:
+        if not limiter.allow(f"user:{user['id']}"):
             raise HTTPException(429, RATE_LIMIT_MESSAGE)
         with request.app.state.pool.connection() as conn:
+            if store.questions_today(conn, user["id"]) >= options.daily_question_limit:
+                raise HTTPException(429, daily_limit_message)
+            if store.cost_today(conn) >= options.daily_cost_cap_usd:
+                log_event("daily_cost_cap_reached", cap_usd=options.daily_cost_cap_usd)
+                raise HTTPException(503, RESTING_MESSAGE)
             conversation = None
             if body.conversation_id:
-                conversation = store.load_conversation(conn, body.conversation_id, **conversation_options(request))
+                conversation = store.load_conversation(
+                    conn, body.conversation_id, user["id"], **conversation_options(request)
+                )
             if conversation is None:
-                conversation_id = store.create_conversation(conn, hash_ip(ip))
-                conversation = store.load_conversation(conn, conversation_id, **conversation_options(request))
+                ip_hash = hash_ip(client_ip(request, options.trusted_proxies))
+                conversation_id = store.create_conversation(conn, user["id"], ip_hash)
+                conversation = store.load_conversation(
+                    conn, conversation_id, user["id"], **conversation_options(request)
+                )
             else:
                 conversation_id = body.conversation_id
             if conversation.is_full:
                 raise HTTPException(409, full_message)
         return StreamingResponse(
-            stream_answer(request.app.state.pool, conversation, conversation_id, body.message),
+            stream_answer(request.app.state.pool, user["id"], conversation, conversation_id, body.message),
             media_type="text/event-stream",
             headers=STREAM_HEADERS,
         )
 
     @app.get("/api/conversations/{conversation_id}")
-    def get_conversation(conversation_id: uuid.UUID, request: Request, user: None = Depends(current_user)) -> dict:
+    def get_conversation(conversation_id: uuid.UUID, request: Request, user: User) -> dict:
         with request.app.state.pool.connection() as conn:
-            conversation = store.load_conversation(conn, conversation_id, **conversation_options(request))
+            conversation = store.load_conversation(conn, conversation_id, user["id"], **conversation_options(request))
             if conversation is None:
                 raise HTTPException(404, "This chat no longer exists.")
             return {
@@ -294,10 +301,11 @@ def create_app(options: AppOptions | None = None) -> FastAPI:
             }
 
     @app.post("/api/feedback", status_code=204)
-    def feedback(body: FeedbackRequest, request: Request, user: None = Depends(current_user)) -> Response:
+    def feedback(body: FeedbackRequest, request: Request, user: User) -> Response:
         with request.app.state.pool.connection() as conn:
-            if not store.save_feedback(conn, body.message_id, body.rating, body.comment):
-                raise HTTPException(404, "That answer no longer exists.")
+            saved = store.save_feedback(conn, user["id"], body.message_id, body.rating, body.comment)
+        if not saved:
+            raise HTTPException(404, "That answer no longer exists.")
         return Response(status_code=204)
 
     return app

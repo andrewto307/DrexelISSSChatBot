@@ -5,10 +5,20 @@ import anthropic
 import pytest
 from fastapi.testclient import TestClient
 
+from app.accounts import SESSION_COOKIE
 from app.main import AppOptions, RateLimiter, client_ip, create_app
 from isss_bot import db
 from isss_bot.answer import content_as_sent
-from tests.fakes import CPT_URL, REQUEST, FakeClient, claude_message, search_result
+from tests.fakes import (
+    CPT_URL,
+    REQUEST,
+    RESET_TABLES,
+    FakeClient,
+    FakeMailer,
+    claude_message,
+    search_result,
+    session_cookie_for,
+)
 
 UPDATE_URL = "https://drexel.edu/x/announcements/2026/September/postponed"
 ANSWER = f"CPT needs one academic year. See [CPT]({CPT_URL})."
@@ -33,23 +43,27 @@ def fake_updates(conn, results):
 @pytest.fixture
 def make_client(migrated_database_url):
     with db.connect(migrated_database_url) as conn:
-        conn.execute("TRUNCATE feedback, messages, conversations")
+        conn.execute(RESET_TABLES)
         conn.commit()
     clients = []
 
-    def make(fake: FakeClient | None = None, **options) -> TestClient:
+    def make(fake: FakeClient | None = None, user: str | None = "student@drexel.edu", **options) -> TestClient:
+        settings = {"mailer": FakeMailer(), "cookie_secure": False, **options}
         app = create_app(
             AppOptions(
                 database_url=migrated_database_url,
                 client=fake or FakeClient(default_reply=claude_message(ANSWER)),
                 search=fake_search,
                 find_updates=fake_updates,
-                **options,
+                **settings,
             )
         )
         client = TestClient(app)
         client.__enter__()
         clients.append(client)
+        if user:
+            with db.connect(migrated_database_url) as conn:
+                client.cookies.set(SESSION_COOKIE, session_cookie_for(conn, user))
         return client
 
     yield make
@@ -208,6 +222,52 @@ def test_health_page_and_security_headers(make_client):
     assert "Unofficial assistant" in page.text
     assert "default-src 'self'" in page.headers["content-security-policy"]
     assert page.headers["x-frame-options"] == "DENY"
+    assert page.headers["cache-control"] == "no-cache"
+    script = client.get("/static/app.js")
+    assert script.headers["cache-control"] == "no-cache"
+    assert client.get("/static/app.js", headers={"If-None-Match": script.headers["etag"]}).status_code == 304
+    assert client.get("/api/auth/me").headers["cache-control"] == "no-store"
+    assert client.get("/login", follow_redirects=False).headers["location"] == "/"
+
+
+def test_logged_out_visitors_see_the_chat_page_but_cannot_chat(make_client):
+    client = make_client(user=None)
+    page = client.get("/", follow_redirects=False)
+    assert page.status_code == 200
+    assert 'href="/login"' in page.text
+    assert "Create an account" in client.get("/login").text
+    assert client.post("/api/chat", json={"message": "Can I do CPT?"}).status_code == 401
+    assert client.get(f"/api/conversations/{uuid.uuid4()}").status_code == 401
+    assert client.post("/api/feedback", json={"message_id": 1, "rating": 1}).status_code == 401
+
+
+def test_users_only_see_their_own_chats(make_client):
+    owner = make_client()
+    _, events = _chat(owner, "Can I do CPT?")
+    conversation_id, message_id = events[0][1]["conversation_id"], events[-1][1]["message_id"]
+    other = make_client(user="other@drexel.edu")
+
+    assert other.get(f"/api/conversations/{conversation_id}").status_code == 404
+    assert other.post("/api/feedback", json={"message_id": message_id, "rating": -1}).status_code == 404
+    _, events = _chat(other, "How do I apply?", conversation_id)
+    assert events[0][1]["conversation_id"] != conversation_id
+    assert len(owner.get(f"/api/conversations/{conversation_id}").json()["messages"]) == 2
+
+
+def test_the_daily_question_limit_stops_more_questions(make_client):
+    client = make_client(daily_question_limit=1)
+    assert _chat(client, "First?")[0].status_code == 200
+    response, _ = _chat(client, "Second?")
+    assert response.status_code == 429
+    assert "daily limit" in response.json()["detail"]
+    assert _chat(make_client(user="other@drexel.edu", daily_question_limit=1), "First?")[0].status_code == 200
+
+
+def test_the_daily_cost_cap_rests_the_assistant_for_everyone(make_client):
+    assert _chat(make_client(daily_cost_cap_usd=0.001), "First?")[0].status_code == 200
+    response, _ = _chat(make_client(user="other@drexel.edu", daily_cost_cap_usd=0.001), "Second?")
+    assert response.status_code == 503
+    assert "resting until tomorrow" in response.json()["detail"]
 
 
 def test_rate_limiter_forgets_old_requests():

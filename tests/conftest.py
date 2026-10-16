@@ -5,7 +5,7 @@ import pytest
 from psycopg import sql
 from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
-from isss_bot import config, db, migrate
+from isss_bot import auth, config, db, migrate
 
 
 @pytest.fixture(scope="session")
@@ -38,3 +38,8 @@ def conn(migrated_database_url):
     finally:
         connection.rollback()
         connection.close()
+
+
+@pytest.fixture(autouse=True)
+def fast_password_hashing(monkeypatch):
+    monkeypatch.setattr(auth, "BCRYPT_ROUNDS", 4)

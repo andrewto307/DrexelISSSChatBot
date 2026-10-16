@@ -1,4 +1,5 @@
 import os
+import secrets
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -28,3 +29,16 @@ RATE_LIMIT_WINDOW_SECONDS = int(os.environ.get("RATE_LIMIT_WINDOW_SECONDS") or 3
 TRUSTED_PROXIES = frozenset(filter(None, (os.environ.get("TRUSTED_PROXIES") or "").split(",")))
 IP_HASH_SECRET = os.environ.get("IP_HASH_SECRET") or "local-development"
 DEV_MODE = (os.environ.get("DEV_MODE") or "").lower() in {"1", "true", "yes"}
+
+ALLOWED_EMAIL_DOMAINS = frozenset(
+    domain.strip().lower() for domain in (os.environ.get("ALLOWED_EMAIL_DOMAINS") or "drexel.edu").split(",")
+)
+JWT_SECRET = os.environ.get("JWT_SECRET") or secrets.token_urlsafe(32)
+COOKIE_SECURE = (os.environ.get("COOKIE_SECURE") or "true").lower() not in {"0", "false", "no"}
+MAILER = os.environ.get("MAILER") or "console"
+AUTH_RATE_LIMIT_ATTEMPTS = int(os.environ.get("AUTH_RATE_LIMIT_ATTEMPTS") or 10)
+AUTH_RATE_LIMIT_IP_ATTEMPTS = int(os.environ.get("AUTH_RATE_LIMIT_IP_ATTEMPTS") or 50)
+AUTH_RATE_LIMIT_WINDOW_SECONDS = int(os.environ.get("AUTH_RATE_LIMIT_WINDOW_SECONDS") or 900)
+DAILY_QUESTION_LIMIT = int(os.environ.get("DAILY_QUESTION_LIMIT") or 30)
+DAILY_COST_CAP_USD = float(os.environ.get("DAILY_COST_CAP_USD") or 3)
+USAGE_TIMEZONE = "America/New_York"

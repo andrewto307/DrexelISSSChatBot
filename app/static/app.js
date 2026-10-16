@@ -2,7 +2,7 @@
 
 (() => {
   const CONVERSATION_KEY = "isss.conversationId";
-  const THEME_KEY = "isss.theme";
+  const PENDING_QUESTION_KEY = "isss.pendingQuestion";
   const MAX_CHARACTERS = 1000;
   const COUNTER_FROM = 800;
 
@@ -14,12 +14,18 @@
     send: document.getElementById("send"),
     newChat: document.getElementById("new-chat"),
     counter: document.getElementById("char-count"),
-    themeButtons: Array.from(document.querySelectorAll("[data-theme-choice]")),
     examples: Array.from(document.querySelectorAll(".example")),
+    account: document.getElementById("account"),
+    accountButton: document.getElementById("account-button"),
+    accountPanel: document.getElementById("account-panel"),
+    accountEmail: document.getElementById("account-email"),
+    logOut: document.getElementById("log-out"),
+    logIn: document.getElementById("log-in"),
   };
 
   const state = {
     conversationId: readStorage(window.sessionStorage, CONVERSATION_KEY),
+    signedIn: null,
     busy: false,
     full: false,
     controller: null,
@@ -37,6 +43,7 @@
     check: svg('<path d="M20 6 9 17l-5-5"/>', 14),
     retry: svg('<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>', 16),
     plus: svg('<path d="M12 5v14M5 12h14"/>', 16),
+    logIn: svg('<path d="M15 4h4v16h-4M10 8l4 4-4 4M14 12H4"/>', 16),
   };
 
   function svg(paths, size = 18) {
@@ -71,43 +78,16 @@
   }
 
 
-  const systemDark = window.matchMedia("(prefers-color-scheme: dark)");
-
-  function themeChoice() {
-    return document.documentElement.getAttribute("data-theme-choice") || "system";
-  }
-
-  function applyTheme(choice) {
-    const dark = choice === "dark" || (choice === "system" && systemDark.matches);
-    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
-    document.documentElement.setAttribute("data-theme-choice", choice);
-    for (const button of ui.themeButtons) {
-      const selected = button.dataset.themeChoice === choice;
-      button.setAttribute("aria-checked", String(selected));
-      button.tabIndex = selected ? 0 : -1;
+  function setSignedIn(signedIn, email = "") {
+    state.signedIn = signedIn;
+    ui.account.hidden = !signedIn;
+    ui.logIn.hidden = signedIn;
+    ui.accountEmail.textContent = email;
+    if (!signedIn) {
+      setAccountOpen(false);
+      setConversation(null);
     }
   }
-
-  function chooseTheme(choice) {
-    writeStorage(window.localStorage, THEME_KEY, choice === "system" ? null : choice);
-    applyTheme(choice);
-  }
-
-  ui.themeButtons.forEach((button, index) => {
-    button.addEventListener("click", () => chooseTheme(button.dataset.themeChoice));
-    button.addEventListener("keydown", (event) => {
-      const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
-      if (!step) return;
-      event.preventDefault();
-      const next = ui.themeButtons[(index + step + ui.themeButtons.length) % ui.themeButtons.length];
-      chooseTheme(next.dataset.themeChoice);
-      next.focus();
-    });
-  });
-  systemDark.addEventListener("change", () => {
-    if (themeChoice() === "system") applyTheme("system");
-  });
-  applyTheme(themeChoice());
 
 
   window.DOMPurify.addHook("afterSanitizeAttributes", (node) => {
@@ -248,6 +228,7 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message_id: messageId, rating, comment }),
     });
+    if (response.status === 401) setSignedIn(false);
     return response.ok;
   }
 
@@ -334,11 +315,12 @@
     body.append(element("strong", "notice-title", title), element("p", null, message));
     if (action) {
       const actions = element("div", "notice-actions");
-      const button = element("button", "button");
-      button.type = "button";
+      const button = element(action.href ? "a" : "button", action.href ? "button button-primary" : "button");
+      if (action.href) button.href = action.href;
+      else button.type = "button";
       button.innerHTML = action.icon;
       button.append(action.label);
-      button.addEventListener("click", action.run);
+      if (action.run) button.addEventListener("click", action.run);
       actions.append(button);
       body.append(actions);
     }
@@ -366,6 +348,19 @@
   }
 
   const newChatAction = { label: "Start a new chat", icon: icons.plus, run: () => newChat() };
+
+  function askToLogIn(view, question) {
+    writeStorage(window.sessionStorage, PENDING_QUESTION_KEY, question);
+    replaceWithNotice(
+      view,
+      notice(
+        "info",
+        "Log in to ask questions",
+        "The assistant is for Drexel students. Log in or create an account with your Drexel email, and your question will be waiting for you.",
+        { label: "Log in", icon: icons.logIn, href: "/login" },
+      ),
+    );
+  }
 
   function markFull() {
     state.full = true;
@@ -424,6 +419,12 @@
     scrollToEnd(true);
     state.followBottom = true;
 
+    if (state.signedIn === false) {
+      askToLogIn(view, question);
+      setBusy(false);
+      return;
+    }
+
     let text = "";
     let finished = false;
     const controller = new AbortController();
@@ -435,10 +436,17 @@
         body: JSON.stringify({ conversation_id: state.conversationId, message: question }),
         signal: controller.signal,
       });
+      if (response.status === 401) {
+        setSignedIn(false);
+        askToLogIn(view, question);
+        return;
+      }
       if (!response.ok) {
         const detail = await errorDetail(response);
         if (response.status === 429) {
-          replaceWithNotice(view, notice("warning", "Slow down a little", detail || "Too many questions for now. Try again in a few minutes."));
+          replaceWithNotice(view, notice("warning", "Question limit reached", detail || "Too many questions for now. Try again later."));
+        } else if (response.status === 503 && detail) {
+          replaceWithNotice(view, notice("info", "The assistant is resting", detail));
         } else if (response.status === 409) {
           view.item.remove();
           addFullNotice(detail || "Start a new chat to keep going.");
@@ -498,6 +506,10 @@
     if (!state.conversationId) return;
     try {
       const response = await fetch(`/api/conversations/${encodeURIComponent(state.conversationId)}`);
+      if (response.status === 401) {
+        setSignedIn(false);
+        return;
+      }
       if (response.status === 404) {
         setConversation(null);
         return;
@@ -540,8 +552,56 @@
   for (const example of ui.examples) {
     example.addEventListener("click", () => ask(example.textContent.trim()));
   }
-  ui.newChat.addEventListener("click", newChat);
+  ui.newChat.addEventListener("click", () => {
+    if (state.conversationId && !window.confirm("Starting a new chat clears this one. You won't be able to come back to it.")) return;
+    newChat();
+  });
 
+
+  function setAccountOpen(open) {
+    ui.accountButton.setAttribute("aria-expanded", String(open));
+    ui.accountPanel.hidden = !open;
+  }
+
+  async function showAccount() {
+    try {
+      const response = await fetch("/api/auth/me");
+      if (response.status === 401) setSignedIn(false);
+      else if (response.ok) setSignedIn(true, (await response.json()).email);
+    } catch {
+      return;
+    }
+  }
+
+  async function logOut() {
+    ui.logOut.disabled = true;
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } finally {
+      writeStorage(window.sessionStorage, CONVERSATION_KEY, null);
+      window.location.assign("/");
+    }
+  }
+
+  ui.accountButton.addEventListener("click", () => setAccountOpen(ui.accountPanel.hidden));
+  document.addEventListener("click", (event) => {
+    if (!ui.accountPanel.hidden && !event.target.closest(".account")) setAccountOpen(false);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !ui.accountPanel.hidden) {
+      setAccountOpen(false);
+      ui.accountButton.focus();
+    }
+  });
+  ui.logOut.addEventListener("click", logOut);
+
+  const pendingQuestion = readStorage(window.sessionStorage, PENDING_QUESTION_KEY);
+  if (pendingQuestion) {
+    writeStorage(window.sessionStorage, PENDING_QUESTION_KEY, null);
+    ui.input.value = pendingQuestion;
+    ui.input.focus();
+  }
   updateComposer();
+  showAccount();
   restore();
 })();

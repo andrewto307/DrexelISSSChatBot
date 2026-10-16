@@ -4,11 +4,14 @@ from pathlib import Path
 import httpx
 from anthropic.types import Message, TextBlock, ThinkingBlock, Usage
 
+from isss_bot import auth
 from isss_bot.search import SearchResult
 
 CPT_URL = "https://drexel.edu/studentlife/student-success/international-student-support/current-students/employment/cpt"
 CPT_TEXT = (Path(__file__).parent / "fixtures" / "cpt.txt").read_text()
 REQUEST = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+RESET_TABLES = "TRUNCATE feedback, messages, conversations, daily_usage, email_codes, users"
+PASSWORD = "correct horse battery"
 
 
 def search_result(url=CPT_URL, title="Curricular Practical Training (CPT)", index=0, content=CPT_TEXT, **extra):
@@ -89,3 +92,33 @@ class FakeMessages:
 class FakeClient:
     def __init__(self, replies=(), rewrite_reply=None, default_reply=None):
         self.messages = FakeMessages(replies, rewrite_reply, default_reply)
+
+
+class FakeMailer:
+    def __init__(self):
+        self.sent = []
+
+    def send(self, email: str, purpose: str, code: str | None = None) -> None:
+        self.sent.append({"email": email, "purpose": purpose, "code": code})
+
+    def last_code(self, email: str, purpose: str) -> str:
+        return next(
+            mail["code"] for mail in reversed(self.sent) if (mail["email"], mail["purpose"]) == (email, purpose)
+        )
+
+
+def verified_user(conn, email: str = "student@drexel.edu", password: str = PASSWORD) -> dict:
+    return conn.execute(
+        """
+        INSERT INTO users (email, password_hash, verified_at) VALUES (%s, %s, now())
+        ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
+        RETURNING id, session_version
+        """,
+        (email, auth.hash_password(password)),
+    ).fetchone()
+
+
+def session_cookie_for(conn, email: str = "student@drexel.edu") -> str:
+    user = verified_user(conn, email)
+    conn.commit()
+    return auth.session_token(user["id"], user["session_version"])
