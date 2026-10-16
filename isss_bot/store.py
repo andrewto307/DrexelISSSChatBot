@@ -3,6 +3,7 @@ import uuid
 import psycopg
 from psycopg.types.json import Json, Jsonb
 
+from isss_bot import config
 from isss_bot.answer import Answer, Conversation
 from isss_bot.search import SearchResult
 from isss_bot.urls import linked_url_keys, url_key
@@ -35,14 +36,22 @@ def text_of(content: list[dict]) -> str:
     return "".join(block.get("text", "") for block in content if block.get("type") == "text")
 
 
-def create_conversation(conn: psycopg.Connection, client_ip_hash: str | None) -> uuid.UUID:
+def create_conversation(conn: psycopg.Connection, user_id: int | None, client_ip_hash: str | None) -> uuid.UUID:
     conversation_id = uuid.uuid4()
-    conn.execute("INSERT INTO conversations (id, client_ip_hash) VALUES (%s, %s)", (conversation_id, client_ip_hash))
+    conn.execute(
+        "INSERT INTO conversations (id, user_id, client_ip_hash) VALUES (%s, %s, %s)",
+        (conversation_id, user_id, client_ip_hash),
+    )
     return conversation_id
 
 
-def load_conversation(conn: psycopg.Connection, conversation_id: uuid.UUID, **options) -> Conversation | None:
-    if conn.execute("SELECT 1 FROM conversations WHERE id = %s", (conversation_id,)).fetchone() is None:
+def load_conversation(
+    conn: psycopg.Connection, conversation_id: uuid.UUID, user_id: int | None, **options
+) -> Conversation | None:
+    owned = conn.execute(
+        "SELECT 1 FROM conversations WHERE id = %s AND user_id IS NOT DISTINCT FROM %s", (conversation_id, user_id)
+    ).fetchone()
+    if owned is None:
         return None
     rows = conn.execute(
         """
@@ -124,8 +133,44 @@ def visible_messages(conn: psycopg.Connection, conversation_id: uuid.UUID) -> li
     return visible
 
 
-def save_feedback(conn: psycopg.Connection, message_id: int, rating: int, comment: str | None) -> bool:
-    found = conn.execute("SELECT 1 FROM messages WHERE id = %s AND role = 'assistant'", (message_id,)).fetchone()
+def record_usage(conn: psycopg.Connection, user_id: int, cost_usd: float) -> None:
+    conn.execute(
+        """
+        INSERT INTO daily_usage (user_id, day, questions, cost_usd)
+        VALUES (%s, (now() AT TIME ZONE %s)::date, 1, %s)
+        ON CONFLICT (user_id, day) DO UPDATE
+        SET questions = daily_usage.questions + 1, cost_usd = daily_usage.cost_usd + EXCLUDED.cost_usd
+        """,
+        (user_id, config.USAGE_TIMEZONE, round(cost_usd, 6)),
+    )
+
+
+def questions_today(conn: psycopg.Connection, user_id: int) -> int:
+    row = conn.execute(
+        "SELECT questions FROM daily_usage WHERE user_id = %s AND day = (now() AT TIME ZONE %s)::date",
+        (user_id, config.USAGE_TIMEZONE),
+    ).fetchone()
+    return row["questions"] if row else 0
+
+
+def cost_today(conn: psycopg.Connection) -> float:
+    row = conn.execute(
+        "SELECT coalesce(sum(cost_usd), 0) AS total FROM daily_usage WHERE day = (now() AT TIME ZONE %s)::date",
+        (config.USAGE_TIMEZONE,),
+    ).fetchone()
+    return float(row["total"])
+
+
+def save_feedback(
+    conn: psycopg.Connection, user_id: int | None, message_id: int, rating: int, comment: str | None
+) -> bool:
+    found = conn.execute(
+        """
+        SELECT 1 FROM messages JOIN conversations ON conversations.id = messages.conversation_id
+        WHERE messages.id = %s AND messages.role = 'assistant' AND conversations.user_id IS NOT DISTINCT FROM %s
+        """,
+        (message_id, user_id),
+    ).fetchone()
     if found is None:
         return False
     conn.execute(

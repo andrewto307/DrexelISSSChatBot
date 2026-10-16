@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="/static/styles.css">
     <script src="/static/vendor/marked.umd.js" defer></script>
     <script src="/static/vendor/purify.min.js" defer></script>
+    <script src="/static/theme-switch.js" defer></script>
     <script src="/static/app.js" defer></script>
   </head>
   <body>
@@ -42,6 +43,23 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
             <span class="new-chat-label">New chat</span>
           </button>
+          <div class="account" id="account" hidden>
+            <button type="button" class="button account-button" id="account-button" aria-label="Account" aria-expanded="false" aria-controls="account-panel">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-3.6 3.6-6 8-6s8 2.4 8 6"/></svg>
+            </button>
+            <div class="account-panel" id="account-panel" hidden>
+              <p class="account-label">Logged in as</p>
+              <p class="account-email" id="account-email"></p>
+              <button type="button" class="menu-item" id="log-out">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4H5v16h4M14 8l4 4-4 4M18 12H9"/></svg>
+                Log out
+              </button>
+            </div>
+          </div>
+          <a class="button button-primary" id="log-in" href="/login" hidden>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h4v16h-4M10 8l4 4-4 4M14 12H4"/></svg>
+            Log in
+          </a>
         </div>
       </header>
 
