@@ -1,0 +1,58 @@
+#!/bin/bash
+# First boot of the ${project} server. Everything after this ships inside the app image (deploy/).
+set -euo pipefail
+
+dnf -y install docker amazon-cloudwatch-agent dnf-automatic logrotate
+systemctl enable --now docker
+
+mkdir -p /usr/local/lib/docker/cli-plugins
+curl -fsSL --retry 5 -o /usr/local/lib/docker/cli-plugins/docker-compose \
+  https://github.com/docker/compose/releases/download/${compose_version}/docker-compose-linux-aarch64
+echo "${compose_sha256}  /usr/local/lib/docker/cli-plugins/docker-compose" | sha256sum -c -
+chmod 755 /usr/local/lib/docker/cli-plugins/docker-compose
+
+if [ ! -f /swapfile ]; then
+  fallocate -l 2G /swapfile
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+  echo '/swapfile none swap defaults 0 0' >> /etc/fstab
+fi
+
+sed -i 's/^upgrade_type *=.*/upgrade_type = security/; s/^apply_updates *=.*/apply_updates = yes/' /etc/dnf/automatic.conf
+systemctl enable --now dnf-automatic.timer
+
+install -d -m 755 /opt/${project} /var/log/${project}
+install -d -m 700 /etc/${project}
+cat > /opt/${project}/settings.env <<'SETTINGS'
+AWS_REGION=${region}
+SITE_ADDRESS=${domain}
+ECR_REPOSITORY=${ecr_repository}
+BACKUP_BUCKET=${backup_bucket}
+SETTINGS
+
+cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<'AGENT'
+{
+  "agent": {"metrics_collection_interval": 60},
+  "metrics": {
+    "namespace": "CWAgent",
+    "append_dimensions": {"InstanceId": "$${aws:InstanceId}"},
+    "aggregation_dimensions": [["InstanceId"]],
+    "metrics_collected": {
+      "disk": {"resources": ["/"], "measurement": ["used_percent"], "drop_device": true},
+      "mem": {"measurement": ["mem_used_percent"]}
+    }
+  },
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {"file_path": "/var/log/${project}/jobs.log", "log_group_name": "${jobs_log_group}", "log_stream_name": "{instance_id}"}
+        ]
+      }
+    }
+  }
+}
+AGENT
+/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s \
+  -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json

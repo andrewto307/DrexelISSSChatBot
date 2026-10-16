@@ -222,3 +222,12 @@ __marimo__/
 .myenv/
 .DS_Store
 evals/results/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+crash.log
+infra/terraform.tfvars

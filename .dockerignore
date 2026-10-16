@@ -1,0 +1,8 @@
+*
+!requirements.txt
+!app/
+!isss_bot/
+!migrations/
+!scripts/
+!deploy/
+**/__pycache__

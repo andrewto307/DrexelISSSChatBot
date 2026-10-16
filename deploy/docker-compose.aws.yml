@@ -1,0 +1,16 @@
+services:
+  app:
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION:?set AWS_REGION}
+        awslogs-group: /drxl-chatbot/app
+        tag: "{{.Name}}"
+
+  caddy:
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION:?set AWS_REGION}
+        awslogs-group: /drxl-chatbot/caddy
+        tag: "{{.Name}}"

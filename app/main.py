@@ -1,7 +1,6 @@
 import hashlib
 import hmac
 import json
-import logging
 import time
 import uuid
 from collections.abc import Callable, Iterator
@@ -21,6 +20,7 @@ from pydantic import BaseModel, Field, StringConstraints
 
 from app import accounts
 from app.accounts import MaybeUser, User
+from app.events import log_event, logger
 from app.limits import RateLimiter, client_ip
 from isss_bot import config, db, migrate, store
 from isss_bot.answer import MAX_QUESTIONS, Answer, AnswerError, Conversation, TextDelta
@@ -55,14 +55,6 @@ RESTING_MESSAGE = (
 REFUSAL_MESSAGE = "I can't help with that one. Try asking about an ISSS topic in a different way."
 SAVE_ERROR_MESSAGE = "Something went wrong while saving this answer. Please try again."
 UNEXPECTED_ERROR_MESSAGE = "Something went wrong on our side. Please try again."
-
-logger = logging.getLogger("isss_bot.app")
-if not logger.handlers:
-    handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter("%(message)s"))
-    logger.addHandler(handler)
-    logger.setLevel(logging.INFO)
-    logger.propagate = False
 
 Question = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=config.MAX_QUESTION_CHARACTERS)
@@ -103,10 +95,6 @@ class AppOptions:
 
 def sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
-
-
-def log_event(event: str, **fields) -> None:
-    logger.info(json.dumps({"event": event, **fields}, default=str))
 
 
 def hash_ip(ip: str) -> str:
@@ -306,6 +294,7 @@ def create_app(options: AppOptions | None = None) -> FastAPI:
             saved = store.save_feedback(conn, user["id"], body.message_id, body.rating, body.comment)
         if not saved:
             raise HTTPException(404, "That answer no longer exists.")
+        log_event("feedback", message_id=body.message_id, rating=body.rating, has_comment=bool(body.comment))
         return Response(status_code=204)
 
     return app

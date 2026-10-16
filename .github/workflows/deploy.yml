@@ -1,0 +1,54 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      vars.AWS_DEPLOY_ROLE_ARN != '' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'))
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    environment:
+      name: production
+      url: ${{ vars.SITE_URL }}
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+      INSTANCE_ID: ${{ vars.INSTANCE_ID }}
+      TAG: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - uses: aws-actions/amazon-ecr-login@v2
+      - name: Build and push the image
+        run: |
+          if aws ecr describe-images --repository-name "${ECR_REPOSITORY#*/}" --image-ids imageTag="$TAG" > /dev/null 2>&1; then
+            echo "Image $TAG is already in the registry"
+          else
+            docker build -t "$ECR_REPOSITORY:$TAG" .
+            docker push "$ECR_REPOSITORY:$TAG"
+          fi
+      - name: Deploy on the server
+        run: deploy/ssm-deploy.sh "$TAG"
+      - name: Check the live site
+        run: curl -fsS --retry 10 --retry-delay 6 --retry-all-errors "${{ vars.SITE_URL }}/health"

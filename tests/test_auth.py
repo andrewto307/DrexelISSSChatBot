@@ -1,12 +1,13 @@
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from botocore.exceptions import ClientError
 from fastapi.testclient import TestClient
 
 from app.accounts import SESSION_COOKIE
 from app.main import AppOptions, create_app
-from isss_bot import auth, db
-from isss_bot.mailer import ConsoleMailer
+from isss_bot import auth, config, db
+from isss_bot.mailer import ConsoleMailer, MailError, SesMailer, create_mailer
 from tests.fakes import PASSWORD, RESET_TABLES, FakeClient, FakeMailer, claude_message, search_result
 
 EMAIL = "abc123@drexel.edu"
@@ -292,3 +293,45 @@ def test_the_console_mailer_prints_each_kind_of_email(capsys):
     assert "123456 is your ISSS Assistant code" in printed
     assert "654321 is your ISSS Assistant password reset code" in printed
     assert "already has an account" in printed
+
+
+class FakeSes:
+    def __init__(self, error=None):
+        self.sent = []
+        self.error = error
+
+    def send_email(self, **request):
+        if self.error:
+            raise self.error
+        self.sent.append(request)
+
+
+class BrokenMailer:
+    def send(self, email, purpose, code=None):
+        raise MailError("ClientError")
+
+
+def test_the_ses_mailer_sends_the_composed_email():
+    ses = FakeSes()
+    SesMailer("ISSS Assistant <no-reply@example.com>", client=ses).send(EMAIL, "verify", "123456")
+    [request] = ses.sent
+    assert request["FromEmailAddress"] == "ISSS Assistant <no-reply@example.com>"
+    assert request["Destination"] == {"ToAddresses": [EMAIL]}
+    assert request["Content"]["Simple"]["Subject"]["Data"] == "123456 is your ISSS Assistant code"
+    assert "123456" in request["Content"]["Simple"]["Body"]["Text"]["Data"]
+
+
+def test_ses_failures_become_mail_errors(monkeypatch):
+    rejected = ClientError({"Error": {"Code": "MessageRejected", "Message": "not verified"}}, "SendEmail")
+    with pytest.raises(MailError, match="MessageRejected"):
+        SesMailer("no-reply@example.com", client=FakeSes(rejected)).send(EMAIL, "verify", "123456")
+    monkeypatch.setattr(config, "MAIL_FROM", "")
+    with pytest.raises(ValueError, match="MAIL_FROM"):
+        create_mailer("ses")
+
+
+def test_a_failed_email_asks_the_student_to_try_again(make_site):
+    client, _ = make_site(mailer=BrokenMailer())
+    response = client.post("/api/auth/signup", json={"email": EMAIL, "password": PASSWORD})
+    assert response.status_code == 503
+    assert "couldn't send the email" in response.json()["detail"]
