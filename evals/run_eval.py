@@ -1,5 +1,6 @@
 import argparse
 import json
+import subprocess
 import sys
 import threading
 import time
@@ -37,7 +38,7 @@ GRADER_SYSTEM_PROMPT = """You grade answers from a chatbot for international stu
 
 GRADER_INSTRUCTIONS = """Grade the chatbot's answer.
 
-- correct: true if the answer gives the core facts in <reference> and doesn't contradict it. Small omissions are fine. For an out-of-scope question, correct means the answer says it couldn't find this on the ISSS website or that it can only help with ISSS topics, and it doesn't answer from general knowledge.
+- correct: true if the answer gives the core facts in <reference> and doesn't contradict it. Small omissions are fine. For an out-of-scope question, correct means the answer says it couldn't find this on the ISSS website or that it can only help with ISSS topics, and it doesn't answer from general knowledge. For a mixed question, which the ISSS website only partly answers, correct also requires the answer to say which part it couldn't find on the ISSS website; leaving that part out without saying so is not a small omission.
 - grounded: true if every factual claim in the answer is supported by the excerpts. Adding facts that aren't in the excerpts, even true ones, makes it false. Pointing the student to ISSS, an ISSS advisor, the ISSS website or where ISSS contact details are doesn't count as a claim.
 - right_language: true if the answer is written in the same language as the question.
 - explanation: one or two sentences on any problem found."""
@@ -86,8 +87,8 @@ def planned_queries(item: dict) -> list[str]:
     return queries
 
 
-def load_questions(ids: set[str] | None, types: set[str] | None) -> list[dict]:
-    items = [json.loads(line) for line in QUESTIONS_PATH.read_text().splitlines() if line.strip()]
+def load_questions(path: Path, ids: set[str] | None, types: set[str] | None) -> list[dict]:
+    items = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
     return [item for item in items if (not ids or item["id"] in ids) and (not types or item["type"] in types)]
 
 
@@ -198,7 +199,7 @@ def summarize(records: list[dict], retrieval_only: bool) -> dict:
             row["grounded"] = rate([r["grade"]["grounded"] for r in group])
             row["cites_expected"] = rate([r["cites_expected_url"] for r in in_scope])
             row["right_language"] = rate([r["grade"]["right_language"] for r in group])
-            row["avg_answer_cost"] = f"${sum(r['answer_cost'] for r in group) / len(group):.4f}"
+            row["avg_answer_cost"] = f"${sum(r['answer_cost'] for r in group) / len(group):.4f}" if group else "-"
         summary[name] = row
     summary["errors"] = len(records) - len(completed)
     summary["total_cost"] = f"${sum(record['cost'] for record in records):.4f}"
@@ -238,9 +239,18 @@ def print_misses(records: list[dict], retrieval_only: bool) -> None:
             print(f"  {record['id']} ({', '.join(problems)}): {record['question']}{explanation}")
 
 
+def code_version() -> str:
+    def git(*command: str) -> str:
+        return subprocess.run(["git", *command], cwd=ROOT, capture_output=True, text=True).stdout.strip()
+
+    commit = git("rev-parse", "--short", "HEAD") or "unknown"
+    return f"{commit}+uncommitted" if git("status", "--porcelain", "--untracked-files=no") else commit
+
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Evaluate retrieval and answers against evals/questions.jsonl.")
+    parser = argparse.ArgumentParser(description="Evaluate retrieval and answers against a question set.")
     parser.add_argument("--label", required=True, help="name for this run, used in the results file name")
+    parser.add_argument("--questions", type=Path, default=QUESTIONS_PATH, help="question set (JSON lines)")
     parser.add_argument("--retrieval-only", action="store_true", help="only check search results (no Claude answers)")
     parser.add_argument("--followup-search", choices=["concat", "rewrite"], default=config.FOLLOWUP_SEARCH)
     parser.add_argument("--model", default=config.CHAT_MODEL)
@@ -253,7 +263,9 @@ def main() -> int:
     args.effort = None if args.effort == "none" else args.effort
 
     items = load_questions(
-        set(args.ids.split(",")) if args.ids else None, set(args.types.split(",")) if args.types else None
+        args.questions,
+        set(args.ids.split(",")) if args.ids else None,
+        set(args.types.split(",")) if args.types else None,
     )
     client = anthropic.Anthropic(max_retries=4)
     vectors = QueryVectors()
@@ -285,6 +297,8 @@ def main() -> int:
     settings = {
         "label": args.label,
         "run_at": datetime.now().isoformat(timespec="seconds"),
+        "questions": args.questions.name,
+        "commit": code_version(),
         "retrieval_only": args.retrieval_only,
         "followup_search": args.followup_search,
         "voyage_model": config.VOYAGE_MODEL,

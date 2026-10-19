@@ -58,30 +58,36 @@ python scripts/review_feedback.py               # answers students rated not hel
 python scripts/review_feedback.py --questions 20 # recent questions as draft eval lines
 python evals/run_eval.py --label my-run --retrieval-only   # search quality only
 python evals/run_eval.py --label my-run                    # answers graded by Claude
+python evals/run_eval.py --label my-run --questions evals/heldout.jsonl   # another question set
 ```
 
-`evals/questions.jsonl` holds 82 test questions. Each one lists the ISSS pages that should answer it and the key facts a correct answer needs. They cover facts, procedures, answers spread over several pages, follow-up questions, exact terms such as form numbers, questions in seven other languages, rules that changed over time, and questions the ISSS site doesn't cover, which the assistant should decline. Claude Opus 5.5 grades each answer: is it correct, is everything it says backed by the ISSS text it was given, and is it in the student's language. Whether the answer links an expected page is checked in code. Run results are saved in `evals/results/`, which isn't committed.
+`evals/questions.jsonl` holds 87 test questions. Each one lists the ISSS pages that should answer it and the key facts a correct answer needs. They cover facts, procedures, answers spread over several pages, follow-up questions, exact terms such as form numbers, questions in seven other languages, rules that changed over time, questions the ISSS site doesn't cover, which the assistant should decline, and questions it only partly covers, where the assistant should answer that part and say what it couldn't find. Claude Opus 5.5 grades each answer: is it correct, is everything it says backed by the ISSS text it was given, and is it in the student's language. Whether the answer links an expected page is checked in code. Run results are saved in `evals/results/`, which isn't committed.
 
-### Latest results
+### Results on the development set
 
-Full run on October 15, 2026, with 80 questions (the 2 newest were added after it):
+These questions were also used to choose the design below (models, search settings, prompt rules), so the scores are optimistic: the system was adjusted until they passed. A separate held-out set, written by hand and never used for tuning, will be run once on a frozen version and reported next to these.
+
+Full run on October 18, 2026, with all 87 questions:
 
 | Check | Result |
 |---|---|
-| Search puts an expected page in the top 6 | 100% (73/73) |
-| Answer is correct | 100% (73/73) |
+| Search puts an expected page in the top 6 | 100% (80/80) |
+| Answer is correct | 100% (80/80) |
+| Question the ISSS site only partly covers: answers that part, says what it couldn't find | 100% (5/5) |
 | Question outside the ISSS site is declined | 100% (7/7) |
-| Everything in the answer is backed by ISSS text | 99% (79/80) |
-| Answer links an expected page | 100% (73/73) |
-| Answer is in the student's language | 100% (80/80) |
+| Everything in the answer is backed by ISSS text | 98% (85/87) |
+| Answer links an expected page | 100% (80/80) |
+| Answer is in the student's language | 100% (87/87) |
+
+The two answers that weren't fully backed each added one unsupported remark, and both passed 3 of 3 reruns.
 
 ### What the evaluations decided
 
 - **Chat model: Claude Sonnet 5.5 at low effort.** Haiku 4.5 added unsupported claims to nearly a third of its answers and answered a question it should have declined. Opus 5.5 was as accurate as Sonnet but costs more and stuck to the sources slightly less often.
-- **Search: vector search blended with keyword matches, weighted by how rare each word is.** This raised the share of questions with an expected page in the top 6 from 95% to 100%.
-- **Embeddings: `voyage-4`.** The larger `voyage-4-large` found no more pages.
+- **Search: vector search blended with keyword matches, weighted by how rare each word is.** It fixed the handful of questions whose expected page was missing from the top 6 during tuning (the question set also grew between those runs, so it isn't a clean before-and-after).
+- **Embeddings: `voyage-4`.** The larger `voyage-4-large` did no better (one question apart, a tie at this size) and costs twice as much.
 - **Follow-up questions are searched two ways at once:** rewritten as a standalone question by Claude Haiku 4.5, and as the conversation's questions joined together. It was the only setup that got every follow-up right.
-- **Prompt rules:** forbidding guesses and outside websites raised the share of fully backed answers from 95% to 99%. Putting links in the sentences they support, instead of a list at the end, made answers about 10% shorter.
+- **Prompt rules:** forbidding guesses and outside websites raised the share of fully backed answers from 95% to 99%. Putting links in the sentences they support, instead of a list at the end, made answers about 10% shorter. Answers now say "the ISSS website" or name the page, because 5 of 15 answers to partly covered questions told students what "the excerpts" said.
 - **Announcements older than 3 years rank slightly lower.** Their share of search slots fell from 25 to 4 of 480, and no expected page was lost.
 
 **Known issue:** when search returns both a proposed rule and the final rule that replaced it, an answer occasionally carries a detail from the proposal over to the final rule.
