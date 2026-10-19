@@ -1,166 +1,108 @@
-# DrexelISSSChatBot
+# ISSS Assistant
 
-An unofficial chatbot that answers international students' questions using the public website of Drexel University's International Students and Scholars Services (ISSS). It searches the ISSS pages first, then has Claude answer from what it found, with links to the pages it used.
+[![CI](https://github.com/andrewto307/DrexelISSSChatBot/actions/workflows/ci.yml/badge.svg)](https://github.com/andrewto307/DrexelISSSChatBot/actions/workflows/ci.yml)
 
-Not affiliated with Drexel University or ISSS, and not legal advice.
+An unofficial assistant that answers international students' questions from the public website of Drexel University's International Students and Scholars Services (ISSS). Every answer comes from the ISSS pages and links to the pages it used.
 
-Live at https://drxl-chatbot.toandrew.com (sign-up needs a `@drexel.edu` email).
+**Try it:** [drxl-chatbot.toandrew.com](https://drxl-chatbot.toandrew.com) (sign-up requires a `@drexel.edu` email address)
+
+> Not affiliated with Drexel University or ISSS. Answers are for information only and are not legal advice.
+
+## Features
+
+- **Grounded answers:** answers only from ISSS pages and documents, links its sources inline, and says so when the site doesn't cover a question.
+- **Up to date:** the site is re-crawled daily, and newer announcements take precedence over older ones.
+- **Conversational:** follow-up questions build on the chat, and replies come in the student's language.
+- **Built for real use:** streaming answers with source cards and feedback, sign-in for verified Drexel email addresses, and usage limits per person and per day.
 
 ## How it works
 
-1. **Crawl:** downloads the ISSS pages and the ISSS documents they link to. Links to other sites are recorded but never read.
-2. **Index:** splits each page into sections, embeds them with Voyage AI, and stores them in Postgres with pgvector and a full-text index.
-3. **Answer:** hybrid search (vector and keyword results merged with reciprocal rank fusion) picks the most relevant sections. Newer announcements that update a linked announcement are added too. Claude then answers from them.
-4. **Chat:** a FastAPI app streams answers to a web page, with source links, feedback buttons, and conversations saved in Postgres.
-5. **Accounts:** anyone can open the chat page, but asking a question needs an account, and only verified `@drexel.edu` addresses can sign up. Each person sees only the chat they're in; old chats are deleted after 15 days. Daily limits cap questions per person and total spending per day.
-6. **Deployment:** one AWS server runs the app, Postgres and Caddy in Docker, built with Terraform and deployed by GitHub Actions on every merge to `main` (see [Deployment](#deployment)).
+```
+ISSS website ──crawl──▶ page sections ──embed──▶ Postgres (pgvector + full-text index)
+                                                          │
+question ──▶ hybrid search (vector + keyword) ──▶ top sections ──▶ Claude ──▶ answer with links
+```
 
-## Setup
+1. **Crawl:** downloads the ISSS pages and the ISSS documents they link to, and detects changed pages by their content.
+2. **Index:** splits pages into sections, embeds them with Voyage AI, and stores them in Postgres with pgvector and a full-text index.
+3. **Search:** merges vector and keyword results with reciprocal rank fusion. Follow-up questions are rewritten into standalone searches, and newer announcements that update a retrieved one are added.
+4. **Answer:** Claude Sonnet 5.5 answers from the retrieved sections, and a FastAPI app streams the answer to the browser.
+
+## Quickstart
 
 Requires Python 3.12+, Docker, an [Anthropic API key](https://console.anthropic.com/) and a [Voyage AI API key](https://dashboard.voyageai.com/).
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt         # the app's packages plus pytest, ruff and Playwright
-python -m playwright install chromium   # only needed for the browser tests
-cp .env.example .env                    # then fill in ANTHROPIC_API_KEY, VOYAGE_API_KEY and JWT_SECRET
-docker compose up -d                    # Postgres + pgvector on localhost:5433
+pip install -r requirements.txt
+cp .env.example .env                 # add ANTHROPIC_API_KEY, VOYAGE_API_KEY and JWT_SECRET
+docker compose up -d                 # Postgres with pgvector on localhost:5433
 python scripts/check_setup.py
+python scripts/update_index.py all   # crawl the ISSS site and build the index
+uvicorn app.main:app --reload        # open http://localhost:8000
 ```
 
-## Usage
+Locally, sign-up and password-reset codes are printed in the uvicorn terminal instead of being emailed. To chat in the terminal instead, run `python scripts/chat_cli.py`.
 
-```bash
-python scripts/update_index.py all      # crawl the site, then embed new or changed pages
-uvicorn app.main:app --reload           # the chat page at http://localhost:8000
-python scripts/chat_cli.py --sources    # or chat in the terminal
-python -m isss_bot.search "Can I do CPT in my first year?"
-```
+## Configuration
 
-Set `DEV_MODE=true` to show each answer's cost and search queries on the page. Database migrations run automatically; `python scripts/migrate.py` runs them by hand.
+Settings are environment variables, read from `.env` during local development.
 
-## Accounts
-
-Open http://localhost:8000, click **Log in** in the top right, then **Create an account** with a `@drexel.edu` address. Locally, emails aren't sent: the sign-up and password reset codes are printed in the terminal running uvicorn.
-
-| Setting | Default | What it does |
+| Variable | Default | Purpose |
 |---|---|---|
-| `JWT_SECRET` | random at each start | Signs login sessions. Set it to a long random value, e.g. `python -c "import secrets; print(secrets.token_urlsafe(32))"`, or everyone is logged out whenever the server restarts. |
-| `COOKIE_SECURE` | `true` | Sends the session cookie over HTTPS only. Chrome and Firefox accept it on `http://localhost`; if logging in doesn't stick in another browser locally, set it to `false` there. |
-| `ALLOWED_EMAIL_DOMAINS` | `drexel.edu` | Comma-separated email domains that can sign up. |
-| `DAILY_QUESTION_LIMIT` | `30` | Questions per person per day. |
-| `DAILY_COST_CAP_USD` | `3` | Total Claude spending per day before the assistant rests until midnight (Philadelphia time). |
+| `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY` | | API keys for answering and embeddings |
+| `JWT_SECRET` | random per start | Signs login sessions; set it so sessions survive restarts |
+| `ALLOWED_EMAIL_DOMAINS` | `drexel.edu` | Email domains allowed to sign up |
+| `DAILY_QUESTION_LIMIT` | `30` | Questions per person per day |
+| `DAILY_COST_CAP_USD` | `3` | Daily API spending limit, after which the assistant pauses until midnight |
+| `CHAT_RETENTION_DAYS` | `15` | Days before inactive chats are deleted |
+| `DEV_MODE` | off | Shows search queries and usage under each answer |
 
-## Feedback and evaluation
+All settings are in [`isss_bot/config.py`](isss_bot/config.py).
 
-```bash
-python scripts/review_feedback.py               # answers students rated not helpful
-python scripts/review_feedback.py --questions 20 # recent questions as draft eval lines
-python evals/run_eval.py --label my-run --retrieval-only   # search quality only
-python evals/run_eval.py --label my-run                    # answers graded by Claude
-python evals/run_eval.py --label my-run --questions evals/heldout.jsonl   # another question set
-```
+## Evaluation
 
-`evals/questions.jsonl` holds 87 test questions. Each one lists the ISSS pages that should answer it and the key facts a correct answer needs. They cover facts, procedures, answers spread over several pages, follow-up questions, exact terms such as form numbers, questions in seven other languages, rules that changed over time, questions the ISSS site doesn't cover, which the assistant should decline, and questions it only partly covers, where the assistant should answer that part and say what it couldn't find. Claude Opus 5.5 grades each answer: is it correct, is everything it says backed by the ISSS text it was given, and is it in the student's language. Whether the answer links an expected page is checked in code. Run results are saved in `evals/results/`, which isn't committed.
+Claude Opus 5.5 grades each answer for correctness, for whether every claim is backed by the ISSS text the assistant was given, and for language. There are two question sets: 87 development questions used while building the system, and 50 test questions written separately and run once on the final version.
 
-### Results on the development set
+| | Development set | Test set |
+|---|---|---|
+| Correct answers | 100% | 88% |
+| Out-of-scope questions declined | 100% | 100% |
+| Answers fully backed by ISSS text | 98% | 96% |
+| Expected page found by search | 100% | 98% |
 
-These questions were also used to choose the design below (models, search settings, prompt rules), so the scores are optimistic: the system was adjusted until they passed. A separate held-out set, written by hand and never used for tuning, will be run once on a frozen version and reported next to these.
-
-Full run on October 18, 2026, with all 87 questions:
-
-| Check | Result |
-|---|---|
-| Search puts an expected page in the top 6 | 100% (80/80) |
-| Answer is correct | 100% (80/80) |
-| Question the ISSS site only partly covers: answers that part, says what it couldn't find | 100% (5/5) |
-| Question outside the ISSS site is declined | 100% (7/7) |
-| Everything in the answer is backed by ISSS text | 98% (85/87) |
-| Answer links an expected page | 100% (80/80) |
-| Answer is in the student's language | 100% (87/87) |
-
-The two answers that weren't fully backed each added one unsupported remark, and both passed 3 of 3 reruns.
-
-### What the evaluations decided
-
-- **Chat model: Claude Sonnet 5.5 at low effort.** Haiku 4.5 added unsupported claims to nearly a third of its answers and answered a question it should have declined. Opus 5.5 was as accurate as Sonnet but costs more and stuck to the sources slightly less often.
-- **Search: vector search blended with keyword matches, weighted by how rare each word is.** It fixed the handful of questions whose expected page was missing from the top 6 during tuning (the question set also grew between those runs, so it isn't a clean before-and-after).
-- **Embeddings: `voyage-4`.** The larger `voyage-4-large` did no better (one question apart, a tie at this size) and costs twice as much.
-- **Follow-up questions are searched two ways at once:** rewritten as a standalone question by Claude Haiku 4.5, and as the conversation's questions joined together. It was the only setup that got every follow-up right.
-- **Prompt rules:** forbidding guesses and outside websites raised the share of fully backed answers from 95% to 99%. Putting links in the sentences they support, instead of a list at the end, made answers about 10% shorter. Answers now say "the ISSS website" or name the page, because 5 of 15 answers to partly covered questions told students what "the excerpts" said.
-- **Announcements older than 3 years rank slightly lower.** Their share of search slots fell from 25 to 4 of 480, and no expected page was lost.
-
-**Known issue:** when search returns both a proposed rule and the final rule that replaced it, an answer occasionally carries a detail from the proposal over to the final rule.
+The development scores are optimistic, since the system was tuned on those questions. See [docs/evaluation.md](docs/evaluation.md) for the method, the question types and the design decisions the results informed.
 
 ## Deployment
 
-```
-Browser ──HTTPS──▶ drxl-chatbot.toandrew.com (DNS A record → Elastic IP)
-                    │
-     ┌──────────────┴─── EC2 t4g.small, us-east-1 (ports 80/443 only, no SSH) ───┐
-     │  Docker Compose:  Caddy (Let's Encrypt) → FastAPI app → Postgres + pgvector  │
-     │  systemd timers:  health check · nightly cleanup + backup · daily ISSS update │
-     └───────────────────────────────────────────────────────────────────────────────┘
-       ECR (images) · S3 (backups, 5 days) · Parameter Store (secrets) · SES (login codes)
-       CloudWatch (logs, alarms, dashboard) · SNS (alarm email) · Budgets
-                    ▲
-GitHub Actions: test → build ARM image → push to ECR → deploy through SSM → check /health
-                (logs in to AWS with OIDC; no AWS keys stored in GitHub)
-```
+The live site runs on a single AWS EC2 instance, with Caddy (automatic HTTPS), the app and Postgres in Docker Compose. Terraform in [`infra/`](infra) defines the AWS resources. GitHub Actions tests every change, then deploys `main` through OIDC and rolls back automatically if the new version fails its health checks. Scheduled jobs refresh the index daily and back up the database nightly.
 
-Everything in AWS is Terraform code in `infra/`. The server's scripts, Compose files and timers live in `deploy/` and ship inside the app image, so they're versioned with the code. Infrastructure costs about $18–19 a month (mostly the server and its fixed IP), plus Claude usage.
+See [docs/deployment.md](docs/deployment.md) for the architecture, first-time setup and operations.
 
-### CI/CD
-
-- **CI** (`.github/workflows/ci.yml`) runs on every pull request and every push to `main`: `ruff`, then all tests against a throwaway Postgres service. Tests use a fake Claude client, so CI needs no API keys.
-- **Deploy** (`.github/workflows/deploy.yml`) starts when CI passes on `main`, or by hand from **Actions → Deploy → Run workflow**. It assumes an AWS role through GitHub's OIDC (trusted only for this repository's `production` environment), builds the ARM64 image tagged with the commit SHA, pushes it to ECR, and runs `deploy/ssm-deploy.sh` on the server through SSM Run Command.
-- **On the server,** `deploy.sh` loads the secrets, runs database migrations and starts the containers, waiting for their health checks. If the new version isn't healthy, it starts the previous image again and the workflow fails. The workflow then checks `https://drxl-chatbot.toandrew.com/health` from GitHub.
-- The workflow reads these repository variables (none are secret): `AWS_REGION`, `AWS_DEPLOY_ROLE_ARN`, `ECR_REPOSITORY`, `INSTANCE_ID`, `SITE_URL`. Until `AWS_DEPLOY_ROLE_ARN` exists, Deploy skips itself.
-
-### Secrets
-
-API keys and generated secrets are `SecureString` parameters under `/drxl-chatbot/` in AWS Parameter Store. They never pass through Terraform, so its state holds none. `deploy/put-secrets.sh` saves them from your own computer: it asks for the Anthropic and Voyage keys with hidden input and creates `JWT_SECRET`, `IP_HASH_SECRET` and `POSTGRES_PASSWORD` once (running it again never changes those, which would log everyone out or lock the app out of its database).
+## Development
 
 ```bash
-AWS_PROFILE=<your profile> deploy/put-secrets.sh
-```
-
-On the server, `load-secrets.sh` writes them into root-only env files; non-secret settings come from `deploy/app.env.defaults` (`MAILER=ses`, `MAIL_FROM`, `TRUSTED_PROXIES`, region).
-
-### First-time setup
-
-1. **Terraform state bucket**, once: `cd infra/bootstrap && terraform init && terraform apply`.
-2. **Everything else:** copy `infra/terraform.tfvars.example` to `infra/terraform.tfvars` and set `alarm_email`, then `cd infra && terraform init && terraform plan -out=tfplan && terraform apply tfplan`. Confirm the SNS email AWS sends.
-3. **DNS:** add the records from `terraform output dns_records` at the domain's DNS provider: the A record, 3 DKIM CNAMEs for SES, and the MAIL FROM MX/SPF and DMARC records.
-4. **Secrets:** run `deploy/put-secrets.sh`.
-5. **SES:** request production access in the SES console. Until it's approved, SES only emails addresses verified in SES.
-6. **GitHub:** create the `production` environment (deployments from `main` only) and the repository variables from `terraform output github_variables`.
-7. **First deploy and index:** merge to `main` (or push an image and run `deploy/ssm-deploy.sh <tag>`), then fill the search index with `deploy/ssm-run.sh 'systemctl start drxl-chatbot-update.service'`.
-
-The commands that talk to the server need `AWS_REGION`, `INSTANCE_ID` and (for deploys) `ECR_REPOSITORY` set, plus an AWS login (`aws login --profile <your profile>`).
-
-### Running it
-
-| Task | How |
-|---|---|
-| Run a command on the server | `deploy/ssm-run.sh '<command>'` (SSM Run Command, no SSH); for an interactive shell, **EC2 → Connect → Session Manager** |
-| See what's running | `deploy/ssm-run.sh '/opt/drxl-chatbot/compose.sh ps'` |
-| Read logs | CloudWatch log groups `/drxl-chatbot/app`, `/drxl-chatbot/caddy` and `/drxl-chatbot/jobs`, e.g. `aws logs tail /drxl-chatbot/app --follow` |
-| Roll back a bad release | Revert the commit and merge, so `main` matches what runs. In an emergency, `deploy/ssm-deploy.sh <earlier commit SHA>` (ECR keeps the last 10 images) |
-| Test the newest backup | `deploy/ssm-run.sh '/opt/drxl-chatbot/restore.sh'` restores it into a scratch database and compares row counts with the live one |
-| Restore over the live database | In a Session Manager shell: `sudo /opt/drxl-chatbot/restore.sh <backup key> --replace` (asks you to type REPLACE) |
-| Update the ISSS index now | `deploy/ssm-run.sh 'systemctl start drxl-chatbot-update.service'` |
-
-Scheduled jobs (UTC): a health check through Caddy every 5 minutes; at 08:00, deleting chats idle for 15 days (`CHAT_RETENTION_DAYS`) and then a `pg_dump` backup to S3, which keeps backups for 5 days; at 09:00, crawling the ISSS site and indexing changed pages.
-
-### Monitoring
-
-The CloudWatch dashboard `drxl-chatbot` shows questions and Claude cost per day, feedback, errors, health checks, and the server's CPU, memory and disk. Alarms email the address in `alarm_email` when the site stops passing health checks for 10 minutes, the server fails AWS's status checks (it's recovered or rebooted automatically), the disk is over 80% full, answers or searches keep failing, a login email can't be sent, the daily cost cap is reached, or a nightly job fails. An AWS budget warns at 80% and 100% of $25 a month.
-
-## Tests
-
-```bash
-pytest                       # no API calls; uses a separate isss_test database
-pytest -m "not browser"      # skip the Playwright browser tests
+pytest                                             # unit, API and browser tests; no API calls
+pytest -m "not browser"                            # skip the Playwright browser tests
 ruff check . && ruff format --check .
+python -m isss_bot.search "Can I do CPT in my first year?"   # inspect search results
 ```
+
+The browser tests need `python -m playwright install chromium`, and the tests use a separate `isss_test` database. Database migrations run automatically at startup.
+
+## Project structure
+
+```
+app/          FastAPI app, accounts and the chat page (static/)
+isss_bot/     crawling, indexing, search and answering
+scripts/      index updates, terminal chat and maintenance
+evals/        question sets and the evaluation runner
+migrations/   database schema
+infra/        Terraform for AWS
+deploy/       server scripts, Compose files and timers
+tests/        pytest suite
+```
+
+## License
+
+[Apache 2.0](LICENSE)
